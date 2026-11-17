@@ -6,7 +6,11 @@
 .devbox/
 .direnv/
 /exports/
-config/
+/config/
+
+settings.local.json
+.claude/skills
+.agents/skills
 
 # Secrets and certs
 .env

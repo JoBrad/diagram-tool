@@ -1,0 +1,738 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "config.schema.json",
+  "title": "Cloudcraft diagram configuration",
+  "description": "Configuration file read by `cloudcraft create`. Mirrors internal/config/config.go.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "cloud"
+  ],
+  "properties": {
+    "diagram": {
+      "$ref": "#/$defs/diagram"
+    },
+    "options": {
+      "$ref": "#/$defs/options"
+    },
+    "cloud": {
+      "description": "Public clouds to collection detail from",
+      "type": "object",
+      "propertyNames": {
+        "$ref": "#/$defs/cloudTypes"
+      },
+      "properties": {
+        "aws": {
+          "$ref": "#/$defs/awsCloudOptions"
+        },
+        "aws_gov": {
+          "$ref": "#/$defs/awsGovCloudOptions"
+        },
+        "azure": {
+          "$ref": "#/$defs/azureCloudOptions"
+        },
+        "azure_gov": {
+          "$ref": "#/$defs/azureGovCloudOptions"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "diagram": {
+      "description": "Diagram name and display options. Each display option is left at Cloudcraft's default when omitted.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "description": "Blueprint name. `--name` overrides it.",
+          "type": "string",
+          "minLength": 1
+        },
+        "projection": {
+          "type": "string",
+          "enum": [
+            "2d",
+            "isometric"
+          ]
+        },
+        "theme": {
+          "type": "string",
+          "enum": [
+            "light",
+            "dark"
+          ]
+        },
+        "showGrid": {
+          "description": "false hides the grid layer.",
+          "type": "boolean"
+        }
+      }
+    },
+    "options": {
+      "description": "Settings every diagram starts from. The app-level config (${XDG_CONFIG_HOME}/diagramming/config.json, else the OS config directory) sets them for all diagrams; a diagram's own options override them.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "show_unconnected_resources": {
+          "description": "Default for every resource type: false leaves out resources with no connection to anything else in the diagram. A resource type's own show_unconnected_resources overrides it. Defaults to false.",
+          "type": "boolean"
+        },
+        "colors": {
+          "$ref": "#/$defs/colors"
+        }
+      }
+    },
+    "cloudTypes": {
+      "type": "string",
+      "enum": [
+        "aws",
+        "aws_gov",
+        "azure",
+        "azure_gov"
+      ]
+    },
+    "awsRegionsList": {
+      "description": "AWS regions to scan.",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minItems": 1,
+        "uniqueItems": true,
+        "enum": [
+          "us-east-1",
+          "us-east-2",
+          "us-west-1",
+          "us-west-2",
+          "af-south-1",
+          "ap-east-1",
+          "ap-east-2",
+          "ap-northeast-1",
+          "ap-northeast-2",
+          "ap-northeast-3",
+          "ap-south-1",
+          "ap-south-2",
+          "ap-southeast-1",
+          "ap-southeast-2",
+          "ap-southeast-3",
+          "ap-southeast-4",
+          "ap-southeast-5",
+          "ap-southeast-6",
+          "ap-southeast-7",
+          "ca-central-1",
+          "ca-west-1",
+          "eu-central-1",
+          "eu-central-2",
+          "eu-north-1",
+          "eu-south-1",
+          "eu-south-2",
+          "eu-west-1",
+          "eu-west-2",
+          "eu-west-3",
+          "il-central-1",
+          "me-central-1",
+          "me-south-1",
+          "mx-central-1",
+          "sa-east-1"
+        ]
+      }
+    },
+    "awsGovCloudRegionsList": {
+      "description": "AWS GovCloud regions to scan.",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minItems": 1,
+        "uniqueItems": true,
+        "enum": [
+          "us-gov-east-1",
+          "us-gov-west-1"
+        ]
+      }
+    },
+    "awsAccount": {
+      "description": "AWS account options.",
+      "type": "object",
+      "properties": {
+        "source": {
+          "description": "Where to read resources: sdk calls the AWS APIs live; steampipe reads a Steampipe database. Defaults to sdk.",
+          "type": "string",
+          "enum": [
+            "sdk",
+            "steampipe"
+          ],
+          "default": "sdk"
+        },
+        "account_id": {
+          "description": "AWS account ID. Required when source is steampipe, which holds every account. With sdk, the account comes from the credentials.",
+          "type": "string",
+          "pattern": "^[0-9]{12}$"
+        },
+        "sso_profile_name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "AWS shared-config profile to load credentials from, for source sdk. Omit to use the SDK's default credential chain."
+        },
+        "resources": {
+          "$ref": "#/$defs/awsResources"
+        }
+      },
+      "if": {
+        "properties": {
+          "source": {
+            "const": "steampipe"
+          }
+        },
+        "required": [
+          "source"
+        ]
+      },
+      "then": {
+        "required": [
+          "account_id"
+        ]
+      }
+    },
+    "awsCloudOptions": {
+      "$ref": "#/$defs/awsAccount",
+      "properties": {
+        "regions": {
+          "$ref": "#/$defs/awsRegionsList"
+        }
+      },
+      "required": [
+        "regions"
+      ],
+      "unevaluatedProperties": false
+    },
+    "awsGovCloudOptions": {
+      "$ref": "#/$defs/awsAccount",
+      "properties": {
+        "regions": {
+          "$ref": "#/$defs/awsGovCloudRegionsList"
+        }
+      },
+      "required": [
+        "regions"
+      ],
+      "unevaluatedProperties": false
+    },
+    "awsResources": {
+      "description": "Resources to collect, keyed by AWS service, then by resource type.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "include_all": {
+          "description": "true collects every resource type the source can read, without naming each one. Per-type queries below still narrow or override their type.",
+          "type": "boolean"
+        },
+        "ec2": {
+          "$ref": "#/$defs/awsEC2Resources"
+        },
+        "kms": {
+          "$ref": "#/$defs/awsKMSResources"
+        },
+        "secretsmanager": {
+          "$ref": "#/$defs/awsSecretsManagerResources"
+        },
+        "ssm": {
+          "$ref": "#/$defs/awsSSMResources"
+        }
+      }
+    },
+    "awsEC2Resources": {
+      "description": "EC2 resource types, one per describe call. Primary types are collected only when named. Container types are always collected, and their query only narrows the results.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "instances": {
+          "description": "Primary. DescribeInstances; IDs match the instance-id filter.",
+          "$ref": "#/$defs/resourceQuery"
+        },
+        "vpn_connections": {
+          "description": "Primary. DescribeVpnConnections; IDs match the vpn-connection-id filter.",
+          "$ref": "#/$defs/resourceQuery"
+        },
+        "internet_gateways": {
+          "description": "Container. DescribeInternetGateways; IDs match the internet-gateway-id filter.",
+          "$ref": "#/$defs/resourceQuery"
+        },
+        "nat_gateways": {
+          "description": "Container. DescribeNatGateways; IDs match the nat-gateway-id filter.",
+          "$ref": "#/$defs/resourceQuery"
+        },
+        "vpcs": {
+          "description": "Container. DescribeVpcs; IDs match the vpc-id filter.",
+          "$ref": "#/$defs/resourceQuery"
+        },
+        "subnets": {
+          "description": "Container. DescribeSubnets; IDs match the subnet-id filter.",
+          "$ref": "#/$defs/resourceQuery"
+        },
+        "security_groups": {
+          "description": "Container. DescribeSecurityGroups; IDs match the group-id filter.",
+          "$ref": "#/$defs/resourceQuery"
+        },
+        "vpn_gateways": {
+          "description": "Container. DescribeVpnGateways; IDs match the vpn-gateway-id filter.",
+          "$ref": "#/$defs/resourceQuery"
+        },
+        "transit_gateways": {
+          "description": "Container. DescribeTransitGateways; IDs match the transit-gateway-id filter.",
+          "$ref": "#/$defs/resourceQuery"
+        },
+        "customer_gateways": {
+          "description": "Container. DescribeCustomerGateways; IDs match the customer-gateway-id filter.",
+          "$ref": "#/$defs/resourceQuery"
+        },
+        "prefix_lists": {
+          "description": "Container. DescribeManagedPrefixLists; IDs match the prefix-list-id filter.",
+          "$ref": "#/$defs/resourceQuery"
+        }
+      }
+    },
+    "resourceQuery": {
+      "description": "Selects resources by ID, by filter, or both. AWS ANDs the conditions. A query with neither collects every resource of its type. Listed ids are always drawn; otherwise show_unconnected_resources decides whether unconnected resources are drawn.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "filters": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/filter"
+          }
+        },
+        "show_unconnected_resources": {
+          "description": "Overrides options.show_unconnected_resources for this type. Cannot be combined with ids.",
+          "type": "boolean"
+        },
+        "hide": {
+          "description": "true leaves this type's resources out of the diagram. A hidden container's contents are drawn in its own container instead: hiding subnets puts their resources in the VPC.",
+          "type": "boolean"
+        },
+        "hide_children": {
+          "description": "true leaves out everything inside this type's resources: a VPC's or subnet's contents, or a security group's members.",
+          "type": "boolean"
+        }
+      },
+      "not": {
+        "required": [
+          "ids",
+          "show_unconnected_resources"
+        ]
+      }
+    },
+    "filter": {
+      "description": "An API filter, passed to the backend API call as Name and Values.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "values"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "values": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "awsKMSResources": {
+      "description": "KMS resource types. Only each key's ID, ARN, and aliases are collected.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "keys": {
+          "description": "Primary. ListKeys and ListAliases; ids match a key ID, key ARN, or alias name. KMS list calls take no filters.",
+          "allOf": [
+            {
+              "$ref": "#/$defs/resourceQuery"
+            },
+            {
+              "not": {
+                "required": [
+                  "filters"
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    "awsSecretsManagerResources": {
+      "description": "Secrets Manager resource types. Only each secret's name and ARN are collected; values are never read.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "secrets": {
+          "description": "Primary. ListSecrets; ids match a secret name or ARN exactly. Filters pass through as ListSecrets filters (name, tag-key, ...).",
+          "$ref": "#/$defs/resourceQuery"
+        }
+      }
+    },
+    "awsSSMResources": {
+      "description": "Systems Manager resource types. Only each parameter's name and ARN are collected; values are never read.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "parameters": {
+          "description": "Primary. DescribeParameters; ids match a parameter name exactly. Filters pass through as ParameterFilters (Name, Path, tag:Key, ...).",
+          "$ref": "#/$defs/resourceQuery"
+        }
+      }
+    },
+    "azureRegionsList": {
+      "description": "Azure regions to scan.",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minItems": 1,
+        "uniqueItems": true,
+        "enum": [
+          "centralus",
+          "centraluseuap",
+          "eastus",
+          "eastus2",
+          "eastus2euap",
+          "northcentralus",
+          "southcentralus",
+          "westus",
+          "westus2",
+          "westus3",
+          "westcentralus",
+          "eastusstg",
+          "southcentralusstg",
+          "eastasia",
+          "southeastasia",
+          "australiacentral",
+          "australiacentral2",
+          "australiaeast",
+          "australiasoutheast",
+          "austriaeast",
+          "belgiumcentral",
+          "brazilsouth",
+          "brazilsoutheast",
+          "canadacentral",
+          "canadaeast",
+          "chilecentral",
+          "denmarkeast",
+          "northeurope",
+          "westeurope",
+          "francecentral",
+          "francesouth",
+          "germanynorth",
+          "germanywestcentral",
+          "centralindia",
+          "southindia",
+          "indiasouthcentral",
+          "westindia",
+          "indonesiacentral",
+          "israelcentral",
+          "italynorth",
+          "japaneast",
+          "japanwest",
+          "jioindiacentral",
+          "jioindiawest",
+          "koreacentral",
+          "koreasouth",
+          "malaysiawest",
+          "mexicocentral",
+          "newzealandnorth",
+          "norwayeast",
+          "norwaywest",
+          "polandcentral",
+          "qatarcentral",
+          "southafricanorth",
+          "southafricawest",
+          "spaincentral",
+          "swedencentral",
+          "switzerlandnorth",
+          "switzerlandwest",
+          "uaecentral",
+          "uaenorth",
+          "uksouth",
+          "ukwest"
+        ]
+      }
+    },
+    "azureGovCloudRegionsList": {
+      "description": "Azure Government Cloud regions to scan.",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minItems": 1,
+        "uniqueItems": true,
+        "enum": [
+          "usgovvirginia",
+          "usdodeast",
+          "usdodcentral",
+          "usgovarizona",
+          "usgovtexas"
+        ]
+      }
+    },
+    "azureResources": {
+      "description": "Resources to collect, keyed by Azure service, then by resource type. Add a service here when its collectors are added.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "include_all": {
+          "description": "true also reads every other regional Azure table in the Steampipe database and draws its resources as plain boxes. Per-type queries below still narrow or override their type.",
+          "type": "boolean"
+        },
+        "compute": {
+          "$ref": "#/$defs/azureComputeResources"
+        },
+        "network": {
+          "$ref": "#/$defs/azureNetworkResources"
+        },
+        "keyvault": {
+          "$ref": "#/$defs/azureKeyVaultResources"
+        },
+        "appconfiguration": {
+          "$ref": "#/$defs/azureAppConfigurationResources"
+        }
+      }
+    },
+    "azureSubscription": {
+      "description": "One Azure subscription to collect from.",
+      "type": "object",
+      "properties": {
+        "source": {
+          "description": "Where to read resources. Only steampipe (a Steampipe database) is supported for Azure.",
+          "type": "string",
+          "enum": [
+            "steampipe"
+          ],
+          "default": "steampipe"
+        },
+        "subscription_id": {
+          "description": "Azure subscription ID (a GUID).",
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+        },
+        "tenant_id": {
+          "description": "Entra ID tenant (directory) ID that owns the subscription. Omit to use the credential's home tenant.",
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+        },
+        "resources": {
+          "$ref": "#/$defs/azureResources"
+        }
+      },
+      "required": [
+        "subscription_id"
+      ]
+    },
+    "azureCloudOptions": {
+      "$ref": "#/$defs/azureSubscription",
+      "properties": {
+        "regions": {
+          "$ref": "#/$defs/azureRegionsList"
+        }
+      },
+      "required": [
+        "regions"
+      ],
+      "unevaluatedProperties": false
+    },
+    "azureGovCloudOptions": {
+      "$ref": "#/$defs/azureSubscription",
+      "properties": {
+        "regions": {
+          "$ref": "#/$defs/azureGovCloudRegionsList"
+        }
+      },
+      "required": [
+        "regions"
+      ],
+      "unevaluatedProperties": false
+    },
+    "azureComputeResources": {
+      "description": "Compute resource types. Primary types are collected only when named.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "virtual_machines": {
+          "description": "Primary. Steampipe table azure_compute_virtual_machine.",
+          "$ref": "#/$defs/azureResourceQuery"
+        },
+        "virtual_machine_scale_sets": {
+          "description": "Primary. Steampipe table azure_compute_virtual_machine_scale_set.",
+          "$ref": "#/$defs/azureResourceQuery"
+        },
+        "disks": {
+          "description": "Primary. Steampipe table azure_compute_disk.",
+          "$ref": "#/$defs/azureResourceQuery"
+        }
+      }
+    },
+    "azureNetworkResources": {
+      "description": "Network resource types. Container types are always collected, and their query only narrows the results.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "virtual_networks": {
+          "description": "Container. Steampipe table azure_virtual_network.",
+          "$ref": "#/$defs/azureResourceQuery"
+        },
+        "subnets": {
+          "description": "Container. Steampipe table azure_subnet.",
+          "$ref": "#/$defs/azureResourceQuery"
+        },
+        "network_security_groups": {
+          "description": "Container. Steampipe table azure_network_security_group. Like AWS security groups, drawn as rules on their members, not as boxes.",
+          "$ref": "#/$defs/azureResourceQuery"
+        },
+        "network_interfaces": {
+          "description": "Container. Steampipe table azure_network_interface. Links virtual machines to subnets and network security groups.",
+          "$ref": "#/$defs/azureResourceQuery"
+        },
+        "public_ips": {
+          "description": "Container. Steampipe table azure_public_ip.",
+          "$ref": "#/$defs/azureResourceQuery"
+        },
+        "nat_gateways": {
+          "description": "Container. Steampipe table azure_nat_gateway.",
+          "$ref": "#/$defs/azureResourceQuery"
+        },
+        "firewalls": {
+          "description": "Primary. Steampipe table azure_firewall.",
+          "$ref": "#/$defs/azureResourceQuery"
+        },
+        "private_endpoints": {
+          "description": "Primary. Steampipe table azure_private_endpoint.",
+          "$ref": "#/$defs/azureResourceQuery"
+        }
+      }
+    },
+    "azureKeyVaultResources": {
+      "description": "Key Vault resource types. Only each vault's name, ID, and URI are collected; the key, secret, and certificate tables are never read.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "vaults": {
+          "description": "Primary. Steampipe table azure_key_vault.",
+          "$ref": "#/$defs/azureResourceQuery"
+        }
+      }
+    },
+    "azureAppConfigurationResources": {
+      "description": "App Configuration resource types, the Azure counterpart to SSM Parameter Store. Only each store's name and ID are collected; key-values are never read.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "stores": {
+          "description": "Primary. Steampipe table azure_app_configuration.",
+          "$ref": "#/$defs/azureResourceQuery"
+        }
+      }
+    },
+    "azureResourceQuery": {
+      "description": "Selects Azure resources. Conditions are ANDed; a query with none selects every resource of its type. Listed ids are always drawn; otherwise show_unconnected_resources decides whether unconnected resources are drawn.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ids": {
+          "description": "Full ARM resource IDs (/subscriptions/.../providers/...). Matched case-insensitively, as Azure treats them.",
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^/subscriptions/"
+          }
+        },
+        "resource_groups": {
+          "description": "Resource group names. Matched case-insensitively.",
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "tags": {
+          "description": "Tag key to required value. Every listed tag must match.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "show_unconnected_resources": {
+          "description": "Overrides options.show_unconnected_resources for this type. Cannot be combined with ids.",
+          "type": "boolean"
+        },
+        "hide": {
+          "description": "true leaves this type's resources out of the diagram. A hidden container's contents are drawn in its own container instead: hiding subnets puts their resources in the VPC.",
+          "type": "boolean"
+        },
+        "hide_children": {
+          "description": "true leaves out everything inside this type's resources: a VPC's or subnet's contents, or a security group's members.",
+          "type": "boolean"
+        }
+      },
+      "not": {
+        "required": [
+          "ids",
+          "show_unconnected_resources"
+        ]
+      }
+    },
+    "colors": {
+      "description": "Color scheme. Each tier's colors rotate across that tier's subnets, and neighbors alternate tints; omit a tier to keep its default, one hue per tier chosen to stay apart for color vision deficiencies. Rule connectors take the color of the subnet, or overridden resource, they start from. A color too light to read is drawn in a darker shade of itself.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "public": {
+          "description": "Colors for public subnets, as #RRGGBB.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "pattern": "^#[0-9A-Fa-f]{6}$"
+          }
+        },
+        "private": {
+          "description": "Colors for private subnets, as #RRGGBB.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "pattern": "^#[0-9A-Fa-f]{6}$"
+          }
+        },
+        "isolated": {
+          "description": "Colors for isolated subnets, as #RRGGBB. Isolated subnets need route tables, which are not collected yet.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "pattern": "^#[0-9A-Fa-f]{6}$"
+          }
+        },
+        "resources": {
+          "description": "Colors for single resources by ID: a subnet, a VPC, or a security group. Wins over the tier.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^#[0-9A-Fa-f]{6}$"
+          }
+        }
+      }
+    }
+  }
+}

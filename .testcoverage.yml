@@ -1,0 +1,9 @@
+profile: coverage.txt
+threshold:
+  file: 80
+  package: 70
+# exclude:
+#   # Thin packages that only call a cloud SDK, with no fake to test them
+#   # against, and hand results to the record builders.
+#   paths:
+#     - ^internal/platform/[^/]+/(sdk|resourcegraph)/

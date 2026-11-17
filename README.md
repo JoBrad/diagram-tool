@@ -1,8 +1,7 @@
 # Diagramming tool
 
 `diagram` reads AWS resources from an account and draws them as a draw.io file, a
-Cloudcraft blueprint, or both. It was built to diagram GovCloud accounts. It reads resources
-live from the AWS APIs, so it works in GovCloud and commercial regions alike, or from a
+Cloudcraft blueprint, or both. It reads resources live from the AWS APIs or from a
 Steampipe database.
 
 It also bulk-exports existing Cloudcraft blueprints to SVG, PNG, PDF, or JSON.
