@@ -1,0 +1,22 @@
+{
+    "editor.formatOnSave": true,
+    "editor.tabSize": 4,
+    "diffEditor.ignoreTrimWhitespace": true,
+    "[go]": {
+        "editor.insertSpaces": false,
+        "editor.formatOnSave": true,
+        "editor.formatOnSaveMode": "file",
+        "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit"
+        },
+    },
+    "go.lintTool": "golangci-lint-v2",
+    "json.schemas": [
+        {
+            "fileMatch": [
+                "config/*.json"
+            ],
+            "url": "./schema/config.schema.json"
+        }
+    ]
+}

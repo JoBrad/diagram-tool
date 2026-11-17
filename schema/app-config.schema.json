@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "app-config.schema.json",
+  "title": "Diagramming app configuration",
+  "description": "Optional app-level configuration at ${XDG_CONFIG_HOME}/diagramming/config.json, else the OS config directory (os.UserConfigDir). Its options apply to every diagram; a diagram's own options override them.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "options": {
+      "$ref": "config.schema.json#/$defs/options"
+    }
+  }
+}
