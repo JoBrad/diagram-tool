@@ -1,0 +1,24 @@
+# Editor options
+.vscode/*.*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+.devbox/
+.direnv/
+/exports/
+config/
+
+# Secrets and certs
+.env
+.envrc
+*.pem
+certs/
+
+
+.DS_Store
+Thumbs.db
+
+# Built binaries, anchored so they do not match package directories
+/diagram
+/cloudcraft
+coverage.txt
