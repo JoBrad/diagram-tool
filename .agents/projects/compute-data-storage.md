@@ -97,11 +97,10 @@ checks in `AGENTS.md` pass. Ships as v0.2.0.
       overlap is accepted. Groups without the flag stay plain nodes.
 - [x] 2026-11-17 - Linked detail pages (a page per group, reached by clicking the group)
       are not part of this project. When and where to use them has not been worked out.
-- [ ] Where a folded group sits when its members are in different subnets. An Auto Scaling
-      group usually spans Availability Zones. Under "A resource in several subnets sits in
-      the first by zone", the folded box sits in one subnet and expands there, showing
-      members from other subnets inside it. Security groups instead use one box per group
-      per subnet (`beautify-diagrams.md`).
+- [x] 2026-11-17 - A folded group whose members span subnets is one box, placed by "A
+      resource in several subnets sits in the first by zone". Unfolded, it shows members
+      from every subnet inside it. One box per group per subnet, as security groups use,
+      was not chosen: it draws a folded group several times, which defeats folding.
 - [x] 2026-11-17 - Primary types are always kept, not only instances. The rule exists so
       the compute the config asks for is always drawn; pruning removes context, never the
       subject. The registry's primary flag sets it. Edits the "Listed IDs are always
