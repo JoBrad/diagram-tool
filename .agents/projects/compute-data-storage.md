@@ -1,6 +1,6 @@
 ---
 type: project
-status: refining
+status: ready
 created: 2026-11-17
 tags: [feature, aws, resource-types, drawio, schema]
 branch: feature/compute-data-storage
@@ -201,9 +201,9 @@ Release:
 ## Notes
 
 - State at the end of planning, 2026-11-17: every decision above is made and none is open.
-  The project stays `refining` until the owner confirms the plan is complete and moves it
-  to `ready`. Coding starts in a new session on `feature/compute-data-storage`, with the
-  shared work first.
+  The owner confirmed the plan complete and set the project to `ready` the same day.
+  Coding starts in a new session on `feature/compute-data-storage`, with the shared work
+  first. Set the project to `active` when it does.
 - Waiting on the owner, outside this project: whether to trim the "Selection rules"
   section of `AGENTS.md` to a pointer at `docs/DECISIONS.md` plus its test list (a
   steering-doc edit, on its own branch), and what to do with the stale projects
