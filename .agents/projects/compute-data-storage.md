@@ -97,13 +97,21 @@ checks in `AGENTS.md` pass. Ships as v0.2.0.
       overlap is accepted. Groups without the flag stay plain nodes.
 - [x] 2026-11-17 - Linked detail pages (a page per group, reached by clicking the group)
       are not part of this project. When and where to use them has not been worked out.
-- [x] 2026-11-17 - A group with `include_members` whose members span subnets draws one
-      folded box per subnet, each holding only the members in that subnet, as security
-      groups do (`beautify-diagrams.md`). Members stay in the subnet they run in. A single
-      box in the first subnet by zone was rejected: unfolded, it would show members from
-      other subnets inside the wrong one.
-- [ ] Where load balancer arrows land when a group is drawn as several boxes: every box, or
-      one.
+- [x] 2026-11-17 - A group with `include_members` whose members span subnets is one folded
+      box, placed by "A resource in several subnets sits in the first by zone". Load
+      balancer arrows land on that box. A member that runs in a different subnet from the
+      box gets its subnet's name (falling back to its ID) as a second label line, in
+      parentheses:
+
+      ```
+      web-01
+      (private-b)
+      ```
+
+      One box per subnet was rejected because the group would draw as several boxes. An
+      overlay rectangle across the subnets, as in AWS reference diagrams, was rejected
+      because an overlay is not a container, so it cannot fold. draw.io gives every cell
+      exactly one parent, so a member cannot sit in its subnet and its group at once.
 - [x] 2026-11-17 - Primary types are always kept, not only instances. The rule exists so
       the compute the config asks for is always drawn; pruning removes context, never the
       subject. The registry's primary flag sets it. Edits the "Listed IDs are always
