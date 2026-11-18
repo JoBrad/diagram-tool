@@ -46,9 +46,10 @@ checks in `AGENTS.md` pass. Ships as v0.2.0.
       `beautify-diagrams.md`.
 - [x] 2026-11-17 - New types draw in draw.io only. Cloudcraft support will be dropped
       (see "Extending the Cloudcraft output" in `docs/DECISIONS.md`).
-- [x] 2026-11-17 - Clusters are drawn without their members: an ECS cluster without its
-      services and tasks, an EKS cluster without its node groups, an RDS cluster without its
-      instances. Load balancers do not draw target groups.
+- [x] 2026-11-17 - By default, clusters are drawn without their members: an ECS cluster
+      without its services and tasks, an EKS cluster without its node groups, an RDS
+      cluster without its instances. `include_members` (below) is the opt-in. Load
+      balancers do not draw target groups.
 - [x] 2026-11-17 - A new `connects_to` relation, drawn as an arrow, runs from a load
       balancer to what its target groups reach: an EC2 instance, an Auto Scaling group, or
       an ECS cluster. Target groups are collected only to resolve the arrow.
@@ -67,8 +68,7 @@ checks in `AGENTS.md` pass. Ships as v0.2.0.
       leaf nodes, and their members (ECS services and tasks, EKS node groups) are not
       collected. RDS instances outside a cluster are their own primary type. As containers,
       clusters would be collected for every config and pruned when empty, which every
-      cluster would be. Members inside clusters can come later, with a registry rule that
-      collects a container type only when its service is named.
+      cluster would be. Members inside a group come from `include_members` instead.
 - [x] 2026-11-17 - When a resource belongs to a collected group or cluster, the group is
       drawn instead of its members: an Auto Scaling group instead of its instances, an RDS
       cluster instead of its DB instances, an ElastiCache replication group instead of its
@@ -87,7 +87,11 @@ checks in `AGENTS.md` pass. Ships as v0.2.0.
       Beanstalk environment with the flag holds its Auto Scaling groups, which hold no
       instances unless their own type has the flag too. The flag collects the member type
       for those groups, so it works without naming the member type. The registry marks
-      which types are groups, and validation rejects the flag on any other type. Named
+      which types are groups, and validation rejects the flag on any other type. Only
+      groups whose member type is collected in this project accept it: Auto Scaling groups
+      (instances), RDS clusters (DB instances), ElastiCache replication groups (cache
+      clusters), and Beanstalk environments (Auto Scaling groups). ECS services and tasks
+      and EKS node groups are not types yet, so ECS and EKS clusters reject it. Named
       `include_members`, not `expand_members`, because the box opens folded (below), and
       "expand" would suggest it opens unfolded.
 - [x] 2026-11-17 - In draw.io, a group with the flag on is a collapsible container
@@ -144,6 +148,17 @@ Shared work, before the types:
 - [ ] Placement for resources with no VPC: grouped by service in their account or region
       (added 2026-11-17)
 - [ ] Load balancers and target groups, for the `connects_to` arrows (added 2026-11-17)
+- [ ] `part_of` relation and group collapsing in `Finish`: hide members of a collected
+      group, follow nested groups to the outermost collected one, and keep members listed
+      by ID (added 2026-11-17)
+- [ ] Primary types always kept: set from the registry's primary flag. Update the "Listed
+      IDs are always drawn" entry in `docs/DECISIONS.md` and the "Selection rules" section
+      of `AGENTS.md`, which says "Instances are always kept" (added 2026-11-17)
+- [ ] `include_members`: the `ResourceQuery` field, registry validation, collecting the
+      member type, and draw.io output as a folded collapsible container with the members'
+      layout in its alternate bounds (added 2026-11-17)
+- [ ] Second label line `(<subnet name>)` for a group member that runs in a different
+      subnet from its group's box (added 2026-11-17)
 - [ ] Integration test suite: `testcontainers-go` starts Moto, collectors run against it,
       gated by `//go:build integration`. Add a devbox script for it, and check which types
       Moto lacks (possibly DSQL, Lightsail, Storage Gateway, FSx) (added 2026-11-17)
@@ -185,6 +200,14 @@ Release:
 
 ## Notes
 
+- State at the end of planning, 2026-11-17: every decision above is made and none is open.
+  The project stays `refining` until the owner confirms the plan is complete and moves it
+  to `ready`. Coding starts in a new session on `feature/compute-data-storage`, with the
+  shared work first.
+- Waiting on the owner, outside this project: whether to trim the "Selection rules"
+  section of `AGENTS.md` to a pointer at `docs/DECISIONS.md` plus its test list (a
+  steering-doc edit, on its own branch), and what to do with the stale projects
+  `multi-cloud-support`, `beautify-diagrams`, and `fix-review-findings`.
 - Prior art reviewed 2026-11-17. Cartography (CNCF, Apache-2.0) declares relationships as
   Python dataclasses read by a generic loader, the model for `RefSpec`. Its AWS placement
   edges are missing for Lambda, EKS, and ElastiCache. Powerpipe's
