@@ -69,19 +69,26 @@ checks in `AGENTS.md` pass. Ships as v0.2.0.
       clusters would be collected for every config and pruned when empty, which every
       cluster would be. Members inside clusters can come later, with a registry rule that
       collects a container type only when its service is named.
-- [x] 2026-11-17 - EC2 instances in an Auto Scaling group are not drawn. The group is drawn
-      as one node, and load balancer arrows land on it. An instance belongs to a group when
-      it carries the `aws:autoscaling:groupName` tag or appears in a group's `Instances`.
-      This is an exception to "instances are always kept" in `AGENTS.md`.
+- [x] 2026-11-17 - When a resource belongs to a collected group or cluster, the group is
+      drawn instead of its members: an Auto Scaling group instead of its instances, an RDS
+      cluster instead of its DB instances, an ElastiCache replication group instead of its
+      nodes, and so on. Load balancer arrows land on the group. Membership is a `part_of`
+      relation, separate from `member_of` (security groups), declared in each builder's
+      `RefSpec` list. `Finish` hides any record with a `part_of` ref to a collected record.
+      An EC2 instance is part of a group when it carries the `aws:autoscaling:groupName`
+      tag or appears in the group's `Instances`.
+- [ ] Nested groups: a Beanstalk environment owns an Auto Scaling group, which owns
+      instances, and an EKS managed node group runs on an Auto Scaling group. Proposed: the
+      outermost collected group is drawn.
 - [x] 2026-11-17 - Primary types are always kept, not only instances. The rule exists so
       the compute the config asks for is always drawn; pruning removes context, never the
       subject. The registry's primary flag sets it. Edits the "Listed IDs are always
       drawn" entry in `docs/DECISIONS.md` and the selection rules in `AGENTS.md`.
-- [x] 2026-11-17 - Group instances are hidden only when Auto Scaling groups are collected.
-      A config that names `instances` but not groups draws every instance, so no compute
+- [x] 2026-11-17 - Members are hidden only when their group is collected. A config that
+      names `instances` but not Auto Scaling groups draws every instance, so no compute
       goes missing.
-- [x] 2026-11-17 - An instance listed by ID is drawn even when it belongs to a group.
-      Listed IDs are never filtered.
+- [x] 2026-11-17 - A member listed by ID is drawn even when its group is collected. Listed
+      IDs are never filtered.
 - [x] 2026-11-17 - New types are checked against Moto, run in a container that
       `testcontainers-go` starts from an integration test suite behind the `integration`
       build tag. Unit tests keep the interface fakes, and `devbox run test` does not need
