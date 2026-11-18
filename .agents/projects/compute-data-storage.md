@@ -81,13 +81,15 @@ checks in `AGENTS.md` pass. Ships as v0.2.0.
       environment owns an Auto Scaling group, which owns instances, and an EKS managed node
       group runs on an Auto Scaling group. With both levels collected, only the outer one
       shows. `Finish` follows `part_of` refs up to the outermost collected record.
-- [x] 2026-11-17 - `expand_members` on a group type's query (`ResourceQuery`, beside
+- [x] 2026-11-17 - `include_members` on a group type's query (`ResourceQuery`, beside
       `hide_children`) draws each group as a box with its members inside, instead of one
-      node. Load balancer arrows still land on the group. One flag opens one level: an
-      expanded Beanstalk environment shows its Auto Scaling groups, which stay collapsed
-      unless their own type is expanded. Expanding collects the member type for the
-      expanded groups, so it works without naming the member type. The registry marks
-      which types are groups, and validation rejects the flag on any other type.
+      node. Load balancer arrows still land on the group. One flag covers one level: a
+      Beanstalk environment with the flag holds its Auto Scaling groups, which hold no
+      instances unless their own type has the flag too. The flag collects the member type
+      for those groups, so it works without naming the member type. The registry marks
+      which types are groups, and validation rejects the flag on any other type. Named
+      `include_members`, not `expand_members`, because the box opens folded (below), and
+      "expand" would suggest it opens unfolded.
 - [x] 2026-11-17 - In draw.io, a group with the flag on is a collapsible container
       (`collapsible=1`) that opens folded (`collapsed="1"`). The layout is computed for the
       folded box, and the members' layout is stored as the alternate bounds. A reader
@@ -95,8 +97,6 @@ checks in `AGENTS.md` pass. Ships as v0.2.0.
       overlap is accepted. Groups without the flag stay plain nodes.
 - [x] 2026-11-17 - Linked detail pages (a page per group, reached by clicking the group)
       are not part of this project. When and where to use them has not been worked out.
-- [ ] Flag name: `expand_members` reads as "drawn expanded", but the group opens folded and
-      becomes expandable. `expandable_members` is the proposed alternative.
 - [ ] Where a folded group sits when its members are in different subnets. An Auto Scaling
       group usually spans Availability Zones. Under "A resource in several subnets sits in
       the first by zone", the folded box sits in one subnet and expands there, showing
