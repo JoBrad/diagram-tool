@@ -62,11 +62,13 @@ checks in `AGENTS.md` pass. Ships as v0.2.0.
       scope. The tool stays a diagrammer.
 - [x] 2026-11-17 - Connections that exist only in IAM policies, environment variables, or
       code are not drawn. The collectors cannot see them reliably.
-- [x] 2026-11-17 - Lambda functions, RDS, S3 buckets, ECS clusters, and EKS clusters are
-      primary types: collected only when the config names them, like instances.
-- [ ] Are the remaining new types primary too? None of them holds other drawn resources,
-      since clusters are drawn without their members, which points to primary for all.
-      Each registry entry records it.
+- [x] 2026-11-17 - Every new type is primary: collected only when the config names its
+      key, like instances. No new container types. Clusters (RDS, ECS, EKS) are primary
+      leaf nodes, and their members (ECS services and tasks, EKS node groups) are not
+      collected. RDS instances outside a cluster are their own primary type. As containers,
+      clusters would be collected for every config and pruned when empty, which every
+      cluster would be. Members inside clusters can come later, with a registry rule that
+      collects a container type only when its service is named.
 - [ ] Is an EC2 instance in an Auto Scaling group drawn on its own, or folded into the
       group? The `connects_to` decision draws arrows to instances "not in an ASG".
 - [x] 2026-11-17 - New types are checked against Moto, run in a container that
