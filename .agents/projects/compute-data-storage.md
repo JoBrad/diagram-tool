@@ -77,9 +77,10 @@ checks in `AGENTS.md` pass. Ships as v0.2.0.
       `RefSpec` list. `Finish` hides any record with a `part_of` ref to a collected record.
       An EC2 instance is part of a group when it carries the `aws:autoscaling:groupName`
       tag or appears in the group's `Instances`.
-- [ ] Nested groups: a Beanstalk environment owns an Auto Scaling group, which owns
-      instances, and an EKS managed node group runs on an Auto Scaling group. Proposed: the
-      outermost collected group is drawn.
+- [x] 2026-11-17 - Nested groups: the outermost collected group is drawn. A Beanstalk
+      environment owns an Auto Scaling group, which owns instances, and an EKS managed node
+      group runs on an Auto Scaling group. With both levels collected, only the outer one
+      shows. `Finish` follows `part_of` refs up to the outermost collected record.
 - [x] 2026-11-17 - Primary types are always kept, not only instances. The rule exists so
       the compute the config asks for is always drawn; pruning removes context, never the
       subject. The registry's primary flag sets it. Edits the "Listed IDs are always
