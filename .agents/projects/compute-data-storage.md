@@ -69,8 +69,10 @@ checks in `AGENTS.md` pass. Ships as v0.2.0.
       Each registry entry records it.
 - [ ] Is an EC2 instance in an Auto Scaling group drawn on its own, or folded into the
       group? The `connects_to` decision draws arrows to instances "not in an ASG".
-- [ ] How new types are checked against live data, for types the owner's accounts do not
-      have: Moto, a short-lived sandbox account, or both.
+- [x] 2026-11-17 - New types are checked against Moto, run in a container that
+      `testcontainers-go` starts from an integration test suite behind the `integration`
+      build tag. Unit tests keep the interface fakes, and `devbox run test` does not need
+      Docker. Moto covers types the owner's accounts do not have.
 
 ## Tasks
 
@@ -90,6 +92,9 @@ Shared work, before the types:
 - [ ] Placement for resources with no VPC: grouped by service in their account or region
       (added 2026-11-17)
 - [ ] Load balancers and target groups, for the `connects_to` arrows (added 2026-11-17)
+- [ ] Integration test suite: `testcontainers-go` starts Moto, collectors run against it,
+      gated by `//go:build integration`. Add a devbox script for it, and check which types
+      Moto lacks (possibly DSQL, Lightsail, Storage Gateway, FSx) (added 2026-11-17)
 
 Compute:
 
