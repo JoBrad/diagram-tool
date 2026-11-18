@@ -69,8 +69,13 @@ checks in `AGENTS.md` pass. Ships as v0.2.0.
       clusters would be collected for every config and pruned when empty, which every
       cluster would be. Members inside clusters can come later, with a registry rule that
       collects a container type only when its service is named.
-- [ ] Is an EC2 instance in an Auto Scaling group drawn on its own, or folded into the
-      group? The `connects_to` decision draws arrows to instances "not in an ASG".
+- [x] 2026-11-17 - EC2 instances in an Auto Scaling group are not drawn. The group is drawn
+      as one node, and load balancer arrows land on it. An instance belongs to a group when
+      it carries the `aws:autoscaling:groupName` tag or appears in a group's `Instances`.
+      This is an exception to "instances are always kept" in `AGENTS.md`.
+- [ ] Two edge cases for group instances: an instance listed by ID in the config (listed
+      IDs are always drawn today), and a config that names `instances` but not Auto
+      Scaling groups (the instances would disappear with nothing in their place).
 - [x] 2026-11-17 - New types are checked against Moto, run in a container that
       `testcontainers-go` starts from an integration test suite behind the `integration`
       build tag. Unit tests keep the interface fakes, and `devbox run test` does not need
