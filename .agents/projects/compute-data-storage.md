@@ -73,9 +73,15 @@ checks in `AGENTS.md` pass. Ships as v0.2.0.
       as one node, and load balancer arrows land on it. An instance belongs to a group when
       it carries the `aws:autoscaling:groupName` tag or appears in a group's `Instances`.
       This is an exception to "instances are always kept" in `AGENTS.md`.
-- [ ] Two edge cases for group instances: an instance listed by ID in the config (listed
-      IDs are always drawn today), and a config that names `instances` but not Auto
-      Scaling groups (the instances would disappear with nothing in their place).
+- [x] 2026-11-17 - Primary types are always kept, not only instances. The rule exists so
+      the compute the config asks for is always drawn; pruning removes context, never the
+      subject. The registry's primary flag sets it. Edits the "Listed IDs are always
+      drawn" entry in `docs/DECISIONS.md` and the selection rules in `AGENTS.md`.
+- [x] 2026-11-17 - Group instances are hidden only when Auto Scaling groups are collected.
+      A config that names `instances` but not groups draws every instance, so no compute
+      goes missing.
+- [x] 2026-11-17 - An instance listed by ID is drawn even when it belongs to a group.
+      Listed IDs are never filtered.
 - [x] 2026-11-17 - New types are checked against Moto, run in a container that
       `testcontainers-go` starts from an integration test suite behind the `integration`
       build tag. Unit tests keep the interface fakes, and `devbox run test` does not need
