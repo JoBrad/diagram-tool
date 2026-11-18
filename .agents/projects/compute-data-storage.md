@@ -88,10 +88,20 @@ checks in `AGENTS.md` pass. Ships as v0.2.0.
       unless their own type is expanded. Expanding collects the member type for the
       expanded groups, so it works without naming the member type. The registry marks
       which types are groups, and validation rejects the flag on any other type.
-- [ ] How an expanded group's box is laid out when its members sit in different subnets.
-      An Auto Scaling group usually spans Availability Zones, so one box cannot sit inside
-      one subnet. Security groups solve the same problem with one box per group per subnet
-      (`beautify-diagrams.md`); the same approach may fit here.
+- [x] 2026-11-17 - In draw.io, a group with the flag on is a collapsible container
+      (`collapsible=1`) that opens folded (`collapsed="1"`). The layout is computed for the
+      folded box, and the members' layout is stored as the alternate bounds. A reader
+      clicks + to show the members, and the box grows over its neighbors. For the MVP that
+      overlap is accepted. Groups without the flag stay plain nodes.
+- [x] 2026-11-17 - Linked detail pages (a page per group, reached by clicking the group)
+      are not part of this project. When and where to use them has not been worked out.
+- [ ] Flag name: `expand_members` reads as "drawn expanded", but the group opens folded and
+      becomes expandable. `expandable_members` is the proposed alternative.
+- [ ] Where a folded group sits when its members are in different subnets. An Auto Scaling
+      group usually spans Availability Zones. Under "A resource in several subnets sits in
+      the first by zone", the folded box sits in one subnet and expands there, showing
+      members from other subnets inside it. Security groups instead use one box per group
+      per subnet (`beautify-diagrams.md`).
 - [x] 2026-11-17 - Primary types are always kept, not only instances. The rule exists so
       the compute the config asks for is always drawn; pruning removes context, never the
       subject. The registry's primary flag sets it. Edits the "Listed IDs are always
