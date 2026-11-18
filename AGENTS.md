@@ -65,6 +65,24 @@ hand the model `inventory.Record` values.
   only its own field of `collected` (`aws_sdk/records.go`), which is what keeps this
   lock-free; records are built once all collectors finish. Keep that rule when adding one.
 
+## Declared references
+
+Each resource type's builder in `internal/platform/aws` declares its references as a
+`[]RefSpec[T]`, where `T` is the SDK type the builder takes, and fills `Refs` from that list
+with `buildRefs`. Both sources feed the same builder. Flag these in review:
+
+- **Helpers growing into a framework.** The helpers stay a handful of small functions
+  (`each`, `one`, `buildRefs`). Options structs, chained builder calls, or helpers that
+  configure other helpers are a smell. Put the logic in the ref's `Values` function instead.
+- **Generics beyond `RefSpec[T]`.** Generics type the `Values` extractor and nothing else.
+  Generic builders, new type constraints, or type switches over SDK types are a smell.
+- **Refs built outside the declaration.** A builder that appends to `Refs` directly hides
+  a connection from the list and from the test that walks every declaration.
+- **`Field` out of step with `Values`.** `Field` is text the compiler cannot check. It must
+  name the field `Values` reads.
+- **A hard case with no `Note`.** A ref that depends on a lookup, a name match, a template,
+  or a condition explains it in `Note`.
+
 ## Selection rules
 
 `show_unconnected_resources` resolves per resource type: listed `ids` (never filtered), else

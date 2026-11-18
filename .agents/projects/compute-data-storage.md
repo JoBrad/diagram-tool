@@ -1,0 +1,141 @@
+---
+type: project
+status: refining
+created: 2026-11-17
+tags: [feature, aws, resource-types, drawio, schema]
+branch: feature/compute-data-storage
+---
+
+# Collect and draw AWS compute, data, and storage resources from both sources
+
+Version 0.1.1 draws EC2 networking, instances, and the secret stores. Most of what runs in
+an account (functions, containers, databases, caches, file systems, buckets) is missing
+unless the Steampipe source's `include_all` picks it up as a plain box. This project adds
+those types to both the SDK and Steampipe sources, each with a hand-written builder that
+declares its references, a type registry that drives the config keys and the generated
+schema, and references that resolve whether the API gave an ID, an ARN, or a name. Done
+means every type listed under Tasks collects from both sources where the source holds it,
+draws in draw.io, has tests, the schema is generated from the registry, and the repo's
+checks in `AGENTS.md` pass. Ships as v0.2.0.
+
+## Decisions
+
+- [x] 2026-11-17 - How connections are defined: in Go code, not in JSON or other config
+      specs. A config spec moves the verbosity into files people edit by hand and will get
+      wrong, and buys one generic parser at the cost of a second language.
+- [x] 2026-11-17 - Each builder declares its references as a `[]RefSpec[T]` (`Relation`,
+      `Target`, `Field`, `Note`, and a typed `Values func(T) []string`) and fills `Refs`
+      with `buildRefs`. The list reads on its own, and one generic test can walk every
+      type's declarations. Review checks are in `AGENTS.md` under "Declared references".
+- [x] 2026-11-17 - Generated docs from the declarations: deferred. Revisit when the types
+      land, if the README needs a supported-resources table.
+- [x] 2026-11-17 - Config keys: a registry-backed map. `config.Resources` holds
+      `service -> type -> query`, a registry in `internal/platform/aws` lists the supported
+      types, and a platform validation step rejects unknown keys before any AWS call.
+      Config files keep their shape. Adding a type means one registry entry, not a struct.
+- [x] 2026-11-17 - The JSON schema is generated from the registry. Hand-editing it per type
+      does not scale to this many types.
+- [x] 2026-11-17 - References resolve through a per-type alias index in `Finish`. Each
+      record has a canonical ID (the short ID for EC2 types, else the ARN) and lists its
+      other forms (ARN, ID, name) as aliases. Refs carry whatever form the API gave and are
+      rewritten to the canonical ID, so an ARN ref and an ID ref land on the same node. An
+      unresolved ref is logged and dropped. Replaces the idea of a `Key` field on
+      `inventory.Ref`.
+- [x] 2026-11-17 - Resources with no VPC sit in the container they belong to (VPC,
+      account, or region), grouped by service, and then follow the canvas-order rules in
+      `beautify-diagrams.md`.
+- [x] 2026-11-17 - New types draw in draw.io only. Cloudcraft support will be dropped
+      (see "Extending the Cloudcraft output" in `docs/DECISIONS.md`).
+- [x] 2026-11-17 - Clusters are drawn without their members: an ECS cluster without its
+      services and tasks, an EKS cluster without its node groups, an RDS cluster without its
+      instances. Load balancers do not draw target groups.
+- [x] 2026-11-17 - A new `connects_to` relation, drawn as an arrow, runs from a load
+      balancer to what its target groups reach: an EC2 instance, an Auto Scaling group, or
+      an ECS cluster. Target groups are collected only to resolve the arrow.
+- [x] 2026-11-17 - DocumentDB and Neptune clusters are drawn as RDS clusters, with the
+      engine in the label.
+- [x] 2026-11-17 - A type the configured source does not hold is not drawn. When a
+      Steampipe database has no table for a type (possibly DSQL or Storage Gateway), the
+      run logs it and continues, per "Omissions are logged, not silent".
+- [x] 2026-11-17 - Timestream: dropped from the list.
+- [x] 2026-11-17 - Reachability (evaluating routes, NACLs, and security groups) is out of
+      scope. The tool stays a diagrammer.
+- [x] 2026-11-17 - Connections that exist only in IAM policies, environment variables, or
+      code are not drawn. The collectors cannot see them reliably.
+- [ ] Which new types are primary (collected only when the config names them, like
+      instances) and which are containers (always collected, like VPCs). Each registry
+      entry records it.
+- [ ] Is an EC2 instance in an Auto Scaling group drawn on its own, or folded into the
+      group? The `connects_to` decision draws arrows to instances "not in an ASG".
+- [ ] How new types are checked against live data, for types the owner's accounts do not
+      have: Moto, a short-lived sandbox account, or both.
+
+## Tasks
+
+Shared work, before the types:
+
+- [ ] Type registry in `internal/platform/aws`, the registry-backed `config.Resources` map,
+      and the platform validation step. Move the existing EC2, KMS, Secrets Manager, and
+      SSM types onto it (added 2026-11-17)
+- [ ] Generate `schema/config.schema.json` from the registry, and update the "Config and
+      schema" section of `AGENTS.md` and the "Unknown config keys fail the read" entry in
+      `docs/DECISIONS.md` (added 2026-11-17)
+- [ ] `RefSpec[T]`, `buildRefs`, its helpers, and the generic test that walks every
+      declaration. Move the existing builders onto it (added 2026-11-17)
+- [ ] `Record.Aliases` and the alias index in `Finish`, with the unresolved-ref warning
+      (added 2026-11-17)
+- [ ] `connects_to` relation, drawn as an arrow in draw.io (added 2026-11-17)
+- [ ] Placement for resources with no VPC: grouped by service in their account or region
+      (added 2026-11-17)
+- [ ] Load balancers and target groups, for the `connects_to` arrows (added 2026-11-17)
+
+Compute:
+
+- [ ] Lambda functions (added 2026-11-17)
+- [ ] ECS clusters (added 2026-11-17)
+- [ ] EKS clusters (added 2026-11-17)
+- [ ] Batch compute environments (added 2026-11-17)
+- [ ] Auto Scaling groups (added 2026-11-17)
+- [ ] Elastic Beanstalk environments (added 2026-11-17)
+- [ ] Lightsail instances (added 2026-11-17)
+
+Data:
+
+- [ ] RDS instances and clusters, including DocumentDB and Neptune (added 2026-11-17)
+- [ ] Aurora DSQL clusters (added 2026-11-17)
+- [ ] DynamoDB tables (added 2026-11-17)
+- [ ] ElastiCache clusters and replication groups (added 2026-11-17)
+- [ ] Redshift clusters (added 2026-11-17)
+- [ ] OpenSearch domains (added 2026-11-17)
+- [ ] Glue jobs and connections (added 2026-11-17)
+
+Storage:
+
+- [ ] S3 buckets (added 2026-11-17)
+- [ ] EBS volumes (added 2026-11-17)
+- [ ] EFS file systems (added 2026-11-17)
+- [ ] FSx file systems (added 2026-11-17)
+- [ ] Storage Gateway gateways (added 2026-11-17)
+- [ ] AWS Backup plans and vaults (added 2026-11-17)
+
+Release:
+
+- [ ] Move the design decisions above into `docs/DECISIONS.md` as the code lands (added
+      2026-11-17)
+- [ ] Update `README.md` and `CHANGELOG.md`, then tag `v0.2.0` (added 2026-11-17)
+
+## Notes
+
+- Prior art reviewed 2026-11-17. Cartography (CNCF, Apache-2.0) declares relationships as
+  Python dataclasses read by a generic loader, the model for `RefSpec`. Its AWS placement
+  edges are missing for Lambda, EKS, and ElastiCache. Powerpipe's
+  `steampipe-mod-aws-insights` (Apache-2.0) stores each edge as a SQL query over Steampipe
+  tables, which makes it a good source for column names and JSON paths. CloudFormation
+  resource schemas use `relationshipRef` in only 27 of 1,894 types, so they are not a
+  source of references.
+- Tests stop at the SDK boundary, as in `AGENTS.md`: fakes for the SDK source and
+  hand-built rows for Steampipe. The SDK's Go types and Steampipe's table docs define the
+  data shapes. Live checks catch fields that are documented but empty in practice.
+- DescribeDBInstances returns the subnet group with its subnets, so RDS needs no lookup.
+  ElastiCache gives only `CacheSubnetGroupName`, and an Aurora instance gives
+  `DBClusterIdentifier`. Those resolve through the alias index.

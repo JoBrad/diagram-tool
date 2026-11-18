@@ -18,6 +18,8 @@ are next.
   readability of draw.io output.
 - [Draw collected resources](../.agents/projects/draw-collected-resources.md): resources
   and rules that are collected but not yet drawn.
+- [Compute, data, and storage](../.agents/projects/compute-data-storage.md): AWS compute,
+  data, and storage resource types from both sources, shipping as v0.2.0.
 
 ## 2. Multi-platform diagrams - next
 

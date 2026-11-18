@@ -649,6 +649,29 @@ their reason where one applies.
 - **Why:** the diagrams show network placement and traffic paths, and IAM is neither.
 - **Shows in:** `internal/platform/aws`
 
+### Connection specs in config files
+
+- **Decision:** how resources connect is defined in Go code, not in JSON or other spec
+  files read by a generic loader.
+- **Why:** a spec moves the verbosity into files people edit by hand, where mistakes go
+  uncaught until run time. Hard cases (lookups, templates, conditions) would still need
+  code, so a reader would have to follow both.
+- **Shows in:** `internal/platform/aws`
+
+### Computing reachability
+
+- **Decision:** the tool does not evaluate whether one resource can reach another through
+  routes, network ACLs, and security groups.
+- **Why:** the tool is a diagrammer. Reachability is analysis, and a different product.
+- **Shows in:** `internal/platform/aws`
+
+### Connections from policies, settings, or code
+
+- **Decision:** connections that exist only in IAM policies, environment variables, or
+  application code are not drawn.
+- **Why:** collectors cannot see them reliably, and a guessed connector would mislead.
+- **Shows in:** `internal/platform/aws`
+
 ### Network ACLs in include_all
 
 - **Decision:** `include_all` skips the network ACL table.
