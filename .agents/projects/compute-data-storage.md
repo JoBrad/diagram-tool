@@ -81,6 +81,17 @@ checks in `AGENTS.md` pass. Ships as v0.2.0.
       environment owns an Auto Scaling group, which owns instances, and an EKS managed node
       group runs on an Auto Scaling group. With both levels collected, only the outer one
       shows. `Finish` follows `part_of` refs up to the outermost collected record.
+- [x] 2026-11-17 - `expand_members` on a group type's query (`ResourceQuery`, beside
+      `hide_children`) draws each group as a box with its members inside, instead of one
+      node. Load balancer arrows still land on the group. One flag opens one level: an
+      expanded Beanstalk environment shows its Auto Scaling groups, which stay collapsed
+      unless their own type is expanded. Expanding collects the member type for the
+      expanded groups, so it works without naming the member type. The registry marks
+      which types are groups, and validation rejects the flag on any other type.
+- [ ] How an expanded group's box is laid out when its members sit in different subnets.
+      An Auto Scaling group usually spans Availability Zones, so one box cannot sit inside
+      one subnet. Security groups solve the same problem with one box per group per subnet
+      (`beautify-diagrams.md`); the same approach may fit here.
 - [x] 2026-11-17 - Primary types are always kept, not only instances. The rule exists so
       the compute the config asks for is always drawn; pruning removes context, never the
       subject. The registry's primary flag sets it. Edits the "Listed IDs are always
