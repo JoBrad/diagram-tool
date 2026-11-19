@@ -7,15 +7,15 @@
 // turn each region's resources into inventory records.
 //
 // To add a resource type:
-//  1. Add its query field to config.Resources (or a service struct under it).
-//  2. Add its resource type, a record builder, and its selection rules to
-//     package aws (aws.go, records.go, and finish.go).
+//  1. Add its resource type, a record builder, and its registry entry to
+//     package aws (aws.go, records.go, and registry.go).
+//  2. Add any selection rules beyond the registry's to finish.go.
 //  3. Add a field to collected (records.go) to hold the results, and build
 //     them into records in collected.records.
 //  4. Write a collect function with the collectFunc signature that assigns
 //     only that field. Add any SDK method it calls to the matching API
 //     interface in clients, and to the fakes in fake_test.go.
-//  5. Register it in collectors.
+//  5. Map its record type to it in collectors.
 package aws_sdk
 
 import (
@@ -33,6 +33,7 @@ import (
 
 	"diagram/internal/config"
 	"diagram/internal/inventory"
+	"diagram/internal/platform/aws"
 )
 
 // maxConcurrentCalls caps in-flight collectors. EC2 throttles describe calls
@@ -92,103 +93,24 @@ func newClients(awsCfg awssdk.Config) *clients {
 	}
 }
 
-// collector ties one resource type's config query to its collect function.
-type collector struct {
-	// name is the resource's path in the config file, used in logs and errors.
-	name string
-	// query returns the config's query for this type, or nil when the config
-	// does not name it.
-	query func(r *config.Resources) *config.ResourceQuery
-	// always collects the type even when the config does not name it. Set for
-	// container types, so the diagram shows every VPC, subnet, and so on.
-	always  bool
-	collect collectFunc
-}
-
-// collectors lists every supported resource type.
-var collectors = []collector{
-	{
-		name:    "ec2.instances",
-		query:   config.EC2Query(func(r *config.EC2Resources) *config.ResourceQuery { return r.Instances }),
-		collect: collectEC2Instances,
-	},
-	{
-		name:    "ec2.vpn_connections",
-		query:   config.EC2Query(func(r *config.EC2Resources) *config.ResourceQuery { return r.VPNConnections }),
-		collect: collectEC2VPNConnections,
-	},
-	{
-		name:    "ec2.vpcs",
-		query:   config.EC2Query(func(r *config.EC2Resources) *config.ResourceQuery { return r.VPCs }),
-		always:  true,
-		collect: collectEC2VPCs,
-	},
-	{
-		name:    "ec2.subnets",
-		query:   config.EC2Query(func(r *config.EC2Resources) *config.ResourceQuery { return r.Subnets }),
-		always:  true,
-		collect: collectEC2Subnets,
-	},
-	{
-		name:    "ec2.security_groups",
-		query:   config.EC2Query(func(r *config.EC2Resources) *config.ResourceQuery { return r.SecurityGroups }),
-		always:  true,
-		collect: collectEC2SecurityGroups,
-	},
-	{
-		name:    "ec2.nat_gateways",
-		query:   config.EC2Query(func(r *config.EC2Resources) *config.ResourceQuery { return r.NATGateways }),
-		always:  true,
-		collect: collectEC2NATGateways,
-	},
-	{
-		name:    "ec2.internet_gateways",
-		query:   config.EC2Query(func(r *config.EC2Resources) *config.ResourceQuery { return r.InternetGateways }),
-		always:  true,
-		collect: collectEC2InternetGateways,
-	},
-	{
-		name:    "ec2.vpn_gateways",
-		query:   config.EC2Query(func(r *config.EC2Resources) *config.ResourceQuery { return r.VPNGateways }),
-		always:  true,
-		collect: collectEC2VPNGateways,
-	},
-	{
-		name:    "ec2.transit_gateways",
-		query:   config.EC2Query(func(r *config.EC2Resources) *config.ResourceQuery { return r.TransitGateways }),
-		always:  true,
-		collect: collectEC2TransitGateways,
-	},
-	{
-		name:    "ec2.customer_gateways",
-		query:   config.EC2Query(func(r *config.EC2Resources) *config.ResourceQuery { return r.CustomerGateways }),
-		always:  true,
-		collect: collectEC2CustomerGateways,
-	},
-	{
-		name:    "ec2.prefix_lists",
-		query:   config.EC2Query(func(r *config.EC2Resources) *config.ResourceQuery { return r.PrefixLists }),
-		always:  true,
-		collect: collectEC2PrefixLists,
-	},
-	{name: "kms.keys", query: func(r *config.Resources) *config.ResourceQuery {
-		if r.KMS == nil {
-			return nil
-		}
-		return r.KMS.Keys
-	}, collect: collectKMSKeys},
-	{name: "secretsmanager.secrets", query: func(r *config.Resources) *config.ResourceQuery {
-		if r.SecretsManager == nil {
-			return nil
-		}
-		return r.SecretsManager.Secrets
-	}, collect: collectSecrets},
-	{name: "ssm.parameters", query: func(r *config.Resources) *config.ResourceQuery {
-		if r.SSM == nil {
-			return nil
-		}
-		return r.SSM.Parameters
-	}, collect: collectSSMParameters},
+// collectors maps each record type the SDK source reads to its collect
+// function. The registry in package aws says which config key names it and
+// whether it is always collected.
+var collectors = map[string]collectFunc{
+	aws.TypeInstance:        collectEC2Instances,
+	aws.TypeVPNConnection:   collectEC2VPNConnections,
+	aws.TypeVPC:             collectEC2VPCs,
+	aws.TypeSubnet:          collectEC2Subnets,
+	aws.TypeSecurityGroup:   collectEC2SecurityGroups,
+	aws.TypeNATGateway:      collectEC2NATGateways,
+	aws.TypeInternetGateway: collectEC2InternetGateways,
+	aws.TypeVPNGateway:      collectEC2VPNGateways,
+	aws.TypeTransitGateway:  collectEC2TransitGateways,
+	aws.TypeCustomerGateway: collectEC2CustomerGateways,
+	aws.TypePrefixList:      collectEC2PrefixLists,
+	aws.TypeKMSKey:          collectKMSKeys,
+	aws.TypeSecret:          collectSecrets,
+	aws.TypeParameter:       collectSSMParameters,
 }
 
 // Collect fetches every configured resource type from every configured
@@ -220,20 +142,24 @@ func collectAll(
 		awsCfg.Region = name
 		api := newClients(awsCfg)
 
-		for _, c := range collectors {
-			q := c.query(&acct.Resources)
+		for _, t := range aws.Registry {
+			collect, ok := collectors[t.Type]
+			if !ok {
+				continue
+			}
+			q := t.Query(&acct.Resources)
 			if q == nil {
-				if !c.always {
+				if t.Primary {
 					continue
 				}
 				q = &config.ResourceQuery{}
 			}
 			g.Go(func() error {
-				n, err := c.collect(ctx, api, q, region)
+				n, err := collect(ctx, api, q, region)
 				if err != nil {
-					return fmt.Errorf("collect %s in %s: %w", c.name, name, err)
+					return fmt.Errorf("collect %s in %s: %w", t.Name(), name, err)
 				}
-				log.Printf("Found %d %s in %s", n, c.name, name)
+				log.Printf("Found %d %s in %s", n, t.Name(), name)
 				return nil
 			})
 		}

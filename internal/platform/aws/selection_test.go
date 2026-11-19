@@ -43,9 +43,9 @@ func vpnRec(id, gateway, cgw string) inventory.Record {
 	return r
 }
 
-func cfgOf(global *bool, ec2 *config.EC2Resources) *config.Config {
+func cfgOf(global *bool, ec2 queries) *config.Config {
 	return &config.Config{
-		Cloud:   config.Clouds{AWS: &config.AWSAccount{Resources: config.Resources{EC2: ec2}}},
+		Cloud:   config.Clouds{AWS: &config.AWSAccount{Resources: *ec2Resources(ec2)}},
 		Options: config.Options{ShowUnconnectedResources: global},
 	}
 }
@@ -104,7 +104,7 @@ func TestSelection(t *testing.T) {
 		{
 			// A subnet kept by ID is content, so it keeps its VPC.
 			name: "IDs on subnets keep an empty subnet and its VPC",
-			cfg:  cfgOf(&no, &config.EC2Resources{Subnets: &config.ResourceQuery{IDs: []string{"subnet-x"}}}),
+			cfg:  cfgOf(&no, queries{"subnets": {IDs: []string{"subnet-x"}}}),
 			records: []inventory.Record{
 				placed("vpc-x", TypeVPC, "", ""), placed("subnet-x", TypeSubnet, "vpc-x", ""),
 			},
@@ -174,8 +174,8 @@ func TestSelection(t *testing.T) {
 			// The security group is shown by override, so the prefix list it
 			// references stays while prefix lists are pruned.
 			name: "a prefix list is kept by a security group shown by override",
-			cfg: cfgOf(&no, &config.EC2Resources{
-				SecurityGroups: &config.ResourceQuery{ShowUnconnectedResources: &yes},
+			cfg: cfgOf(&no, queries{
+				"security_groups": {ShowUnconnectedResources: &yes},
 			}),
 			records: []inventory.Record{
 				sgWith("sg-empty", "", "pl-1"),

@@ -59,7 +59,7 @@ func TestRead(t *testing.T) {
 				len(acct.Regions) != tt.regions {
 				t.Errorf("Account() = %s, %+v", key, acct)
 			}
-			if got := acct.Resources.EC2 != nil && acct.Resources.EC2.Instances != nil; got != tt.hasEC2Inst {
+			if got := acct.Resources.Query("ec2", "instances") != nil; got != tt.hasEC2Inst {
 				t.Errorf("instances query present = %v, want %v", got, tt.hasEC2Inst)
 			}
 		})
@@ -104,10 +104,24 @@ func TestReadErrors(t *testing.T) {
 			"cloud.aws.resources.ec2.vpcs: ids and show_unconnected_resources cannot be combined",
 		},
 		{
-			"kms filters",
-			`{"cloud": {"aws": {"regions": ["us-east-1"], "resources": {"kms": {"keys":
-				{"filters": [{"name": "x", "values": ["y"]}]}}}}}}`,
-			"cloud.aws.resources.kms.keys: filters are not supported",
+			"misspelled query field",
+			`{"cloud": {"aws": {"regions": ["us-east-1"], "resources": {"ec2": {"vpcs": {"idz": ["vpc-1"]}}}}}}`,
+			`resources.ec2.vpcs: json: unknown field "idz"`,
+		},
+		{
+			"service not an object",
+			`{"cloud": {"aws": {"regions": ["us-east-1"], "resources": {"ec2": true}}}}`,
+			"resources.ec2: json: cannot unmarshal",
+		},
+		{
+			"include_all not a bool",
+			`{"cloud": {"aws": {"regions": ["us-east-1"], "resources": {"include_all": "yes"}}}}`,
+			"resources.include_all: json: cannot unmarshal",
+		},
+		{
+			"resources not an object",
+			`{"cloud": {"aws": {"regions": ["us-east-1"], "resources": []}}}`,
+			"json: cannot unmarshal array",
 		},
 		{
 			"bad projection", `{"cloud": {"aws": {"regions": ["us-east-1"]}}, "diagram": {"projection": "3d"}}`,
@@ -141,9 +155,9 @@ func TestReadHide(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, acct := cfg.Account()
-	if !acct.Resources.EC2.Subnets.Hide || !acct.Resources.EC2.VPCs.HideChildren {
-		t.Errorf("ec2 = %+v %+v, want subnets hidden and VPC children hidden",
-			acct.Resources.EC2.Subnets, acct.Resources.EC2.VPCs)
+	subnets, vpcs := acct.Resources.Query("ec2", "subnets"), acct.Resources.Query("ec2", "vpcs")
+	if !subnets.Hide || !vpcs.HideChildren {
+		t.Errorf("ec2 = %+v %+v, want subnets hidden and VPC children hidden", subnets, vpcs)
 	}
 }
 
@@ -174,13 +188,22 @@ func readNoApp(path string) (*Config, error) {
 	return read(path, "")
 }
 
-func TestEC2Query(t *testing.T) {
-	vpcs := EC2Query(func(e *EC2Resources) *ResourceQuery { return e.VPCs })
-	if q := vpcs(&Resources{}); q != nil {
-		t.Errorf("no ec2 section: %+v, want nil", q)
-	}
+func TestResourcesQuery(t *testing.T) {
 	want := &ResourceQuery{IDs: []string{"vpc-1"}}
-	if q := vpcs(&Resources{EC2: &EC2Resources{VPCs: want}}); q != want {
-		t.Errorf("query = %+v, want %+v", q, want)
+	r := Resources{Services: map[string]map[string]*ResourceQuery{"ec2": {"vpcs": want}}}
+	for _, tt := range []struct {
+		service, typ string
+		want         *ResourceQuery
+	}{
+		{"ec2", "vpcs", want},
+		{"ec2", "subnets", nil},
+		{"kms", "keys", nil},
+	} {
+		if q := r.Query(tt.service, tt.typ); q != tt.want {
+			t.Errorf("Query(%s, %s) = %+v, want %+v", tt.service, tt.typ, q, tt.want)
+		}
+	}
+	if q := (&Resources{}).Query("ec2", "vpcs"); q != nil {
+		t.Errorf("no services: %+v, want nil", q)
 	}
 }

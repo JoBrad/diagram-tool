@@ -8,7 +8,6 @@ import (
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
-	"diagram/internal/config"
 	"diagram/internal/inventory"
 	"diagram/internal/platform/aws"
 	"diagram/internal/steampipe"
@@ -25,18 +24,15 @@ var tables = []table{
 				"private_ip_address", "public_ip_address", "subnet_id", "vpc_id", "security_groups",
 			},
 		},
-		resource: "ec2.instances",
-		query:    config.EC2Query(func(r *config.EC2Resources) *config.ResourceQuery { return r.Instances }),
-		record:   instanceRecord,
+		typ:    aws.TypeInstance,
+		record: instanceRecord,
 	},
 	{
 		Table: steampipe.Table{
 			Name: "aws_vpc", IDColumn: "vpc_id", Columns: []string{"vpc_id", "title", "cidr_block"},
 		},
-		resource: "ec2.vpcs",
-		query:    config.EC2Query(func(r *config.EC2Resources) *config.ResourceQuery { return r.VPCs }),
-		always:   true,
-		record:   vpcRecord,
+		typ:    aws.TypeVPC,
+		record: vpcRecord,
 	},
 	{
 		Table: steampipe.Table{
@@ -51,20 +47,16 @@ var tables = []table{
 				"map_public_ip_on_launch",
 			},
 		},
-		resource: "ec2.subnets",
-		query:    config.EC2Query(func(r *config.EC2Resources) *config.ResourceQuery { return r.Subnets }),
-		always:   true,
-		record:   subnetRecord,
+		typ:    aws.TypeSubnet,
+		record: subnetRecord,
 	},
 	{
 		Table: steampipe.Table{
 			Name: "aws_vpc_security_group", IDColumn: "group_id",
 			Columns: []string{"group_id", "group_name", "vpc_id", "ip_permissions", "ip_permissions_egress"},
 		},
-		resource: "ec2.security_groups",
-		query:    config.EC2Query(func(r *config.EC2Resources) *config.ResourceQuery { return r.SecurityGroups }),
-		always:   true,
-		record:   securityGroupRecord,
+		typ:    aws.TypeSecurityGroup,
+		record: securityGroupRecord,
 	},
 }
 

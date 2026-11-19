@@ -17,20 +17,24 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 
 	"diagram/internal/config"
+	"diagram/internal/platform/aws"
 )
 
 var errFake = errors.New("fake failure")
 
 // allResources names every resource type that is collected only when named.
 func allResources() config.Resources {
-	return config.Resources{
-		EC2: &config.EC2Resources{Instances: &config.ResourceQuery{}, VPNConnections: &config.ResourceQuery{}},
-		KMS: &config.KMSResources{Keys: &config.ResourceQuery{}},
-		SecretsManager: &config.SecretsManagerResources{
-			Secrets: &config.ResourceQuery{},
-		},
-		SSM: &config.SSMResources{Parameters: &config.ResourceQuery{}},
+	r := config.Resources{Services: map[string]map[string]*config.ResourceQuery{}}
+	for _, rt := range aws.Registry {
+		if !rt.Primary {
+			continue
+		}
+		if r.Services[rt.Service] == nil {
+			r.Services[rt.Service] = map[string]*config.ResourceQuery{}
+		}
+		r.Services[rt.Service][rt.Key] = &config.ResourceQuery{}
 	}
+	return r
 }
 
 func TestCollectAll(t *testing.T) {
@@ -182,10 +186,10 @@ func TestCollectors(t *testing.T) {
 	vpn.Options.TunnelOptions[0].PreSharedKey = nil
 	wv := reflect.ValueOf(want).Elem()
 
-	for _, c := range collectors {
-		t.Run(c.name, func(t *testing.T) {
+	for typ, collect := range collectors {
+		t.Run(typ, func(t *testing.T) {
 			got := &collected{}
-			n, err := c.collect(context.Background(), newFakes().clients(), &config.ResourceQuery{}, got)
+			n, err := collect(context.Background(), newFakes().clients(), &config.ResourceQuery{}, got)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -213,12 +217,12 @@ func TestCollectors(t *testing.T) {
 }
 
 func TestCollectorsReturnErrors(t *testing.T) {
-	for _, c := range collectors {
-		t.Run(c.name, func(t *testing.T) {
+	for typ, collect := range collectors {
+		t.Run(typ, func(t *testing.T) {
 			f := newFakes()
 			f.fail(errFake)
 			got := &collected{}
-			n, err := c.collect(context.Background(), f.clients(), &config.ResourceQuery{}, got)
+			n, err := collect(context.Background(), f.clients(), &config.ResourceQuery{}, got)
 			if !errors.Is(err, errFake) || n != 0 {
 				t.Errorf("collect = %d, %v; want 0, %v", n, err, errFake)
 			}
@@ -229,14 +233,33 @@ func TestCollectorsReturnErrors(t *testing.T) {
 	}
 }
 
-// collectorNamed returns the registered collector for a config path.
-func collectorNamed(t *testing.T, name string) collector {
+// collectorNamed returns the collector for a config path.
+func collectorNamed(t *testing.T, name string) collectFunc {
 	t.Helper()
-	i := slices.IndexFunc(collectors, func(c collector) bool { return c.name == name })
+	i := slices.IndexFunc(aws.Registry, func(rt aws.ResourceType) bool { return rt.Name() == name })
 	if i < 0 {
-		t.Fatalf("no collector named %q", name)
+		t.Fatalf("no registered type named %q", name)
 	}
-	return collectors[i]
+	collect, ok := collectors[aws.Registry[i].Type]
+	if !ok {
+		t.Fatalf("no collector for %q", name)
+	}
+	return collect
+}
+
+// Every collector reads a registered type, so the registry decides when it
+// runs, and every registered type has a collector.
+func TestCollectorsRegistered(t *testing.T) {
+	for typ := range collectors {
+		if _, ok := aws.Lookup(typ); !ok {
+			t.Errorf("collector for %s, which is not in aws.Registry", typ)
+		}
+	}
+	for _, rt := range aws.Registry {
+		if _, ok := collectors[rt.Type]; !ok {
+			t.Errorf("%s is registered but has no collector", rt.Name())
+		}
+	}
 }
 
 // first returns the first input of type In a fake received.

@@ -16,20 +16,20 @@ import (
 
 	"diagram/internal/config"
 	"diagram/internal/inventory"
+	"diagram/internal/platform/aws"
 	"diagram/internal/steampipe"
 )
 
 // table is one Steampipe table the reader knows how to turn into records.
 type table struct {
 	steampipe.Table
-	// resource is the type's path in the config file, used in logs and
-	// errors.
+	// typ is the record type of a table in aws.Registry, which gives its
+	// config key and whether it is always read. Empty for a discovered table.
+	typ string
+	// resource names the table in logs and errors: the registry type's path
+	// in the config file, or a discovered table's name.
 	resource string
-	query    func(*config.Resources) *config.ResourceQuery
-	// always reads the table even when the config does not name it. Set for
-	// container types, as the SDK collectors do.
-	always bool
-	record func(steampipe.Row) (inventory.Record, bool, error)
+	record   func(steampipe.Row) (inventory.Record, bool, error)
 }
 
 // scope returns the rows of acct's account in its regions, leaving out rows
@@ -62,9 +62,11 @@ func Collect(ctx context.Context, src steampipe.Source, acct *config.AWSAccount)
 	}
 
 	for _, t := range tables {
-		q := t.query(&acct.Resources)
+		rt, _ := aws.Lookup(t.typ)
+		t.resource = rt.Name()
+		q := rt.Query(&acct.Resources)
 		if q == nil {
-			if !t.always && !acct.Resources.IncludeAll {
+			if rt.Primary && !acct.Resources.IncludeAll {
 				continue
 			}
 			q = &config.ResourceQuery{}
@@ -129,30 +131,15 @@ func read(
 // missing returns the config's named resource types that no Steampipe table
 // serves yet.
 func missing(r *config.Resources) []string {
+	served := map[string]bool{}
+	for _, t := range tables {
+		served[t.typ] = true
+	}
 	var out []string
-	if r.EC2 != nil {
-		for name, q := range map[string]*config.ResourceQuery{
-			"ec2.vpn_connections":   r.EC2.VPNConnections,
-			"ec2.internet_gateways": r.EC2.InternetGateways,
-			"ec2.nat_gateways":      r.EC2.NATGateways,
-			"ec2.vpn_gateways":      r.EC2.VPNGateways,
-			"ec2.transit_gateways":  r.EC2.TransitGateways,
-			"ec2.customer_gateways": r.EC2.CustomerGateways,
-			"ec2.prefix_lists":      r.EC2.PrefixLists,
-		} {
-			if q != nil {
-				out = append(out, name)
-			}
+	for _, rt := range aws.Registry {
+		if rt.Query(r) != nil && !served[rt.Type] {
+			out = append(out, rt.Name())
 		}
-	}
-	if r.KMS != nil && r.KMS.Keys != nil {
-		out = append(out, "kms.keys")
-	}
-	if r.SecretsManager != nil && r.SecretsManager.Secrets != nil {
-		out = append(out, "secretsmanager.secrets")
-	}
-	if r.SSM != nil && r.SSM.Parameters != nil {
-		out = append(out, "ssm.parameters")
 	}
 	slices.Sort(out)
 	return out

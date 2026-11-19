@@ -120,6 +120,9 @@ func TestRunCreateErrors(t *testing.T) {
 	out := t.TempDir()
 	unnamed := writeConfig(t, strings.Replace(steampipeConfig, "%s", "", 1))
 	named := writeConfig(t, strings.Replace(steampipeConfig, "%s", `, "diagram": {"name": "Prod"}`, 1))
+	// The unknown type fails validation before the database is opened.
+	typo := writeConfig(t, `{"cloud": {"aws": {"regions": ["us-east-1"],
+		"resources": {"ec2": {"instance": {}}}}}, "diagram": {"name": "Prod"}}`)
 	tests := []struct {
 		name    string
 		args    []string
@@ -129,6 +132,10 @@ func TestRunCreateErrors(t *testing.T) {
 		{"no config", []string{"--draw.io", "-p", out}, "--config is required"},
 		{"missing config", []string{"--draw.io", "-p", out, "-c", filepath.Join(out, "nope.json")}, "nope.json"},
 		{"no name", []string{"--draw.io", "-p", out, "-c", unnamed}, "no diagram name"},
+		{
+			"unknown resource type", []string{"--draw.io", "-p", out, "-c", typo},
+			"configuration: cloud.aws.resources.ec2.instance: unknown resource type",
+		},
 		// Each of these has a name, so it gets as far as reading the account.
 		{"name from config", []string{"--draw.io", "-p", out, "-c", named}, "no Steampipe database"},
 		{"name flag", []string{"--draw.io", "-p", out, "-c", unnamed, "-n", "Prod"}, "no Steampipe database"},

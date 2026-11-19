@@ -90,7 +90,7 @@ func TestEC2CollectorsSendFilters(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.collector, func(t *testing.T) {
 			f := newFakes()
-			if _, err := collectorNamed(t, tt.collector).collect(
+			if _, err := collectorNamed(t, tt.collector)(
 				context.Background(), f.clients(), q, &collected{},
 			); err != nil {
 				t.Fatal(err)

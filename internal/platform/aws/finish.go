@@ -8,51 +8,6 @@ import (
 	"diagram/internal/inventory"
 )
 
-// kind is how Finish applies the config to one resource type.
-type kind struct {
-	// query returns the config's query for the type, or nil.
-	query func(*config.Resources) *config.ResourceQuery
-	// prunable types are dropped when unconnected and the config asks for
-	// that. Instances are never pruned: they are what the config asks to
-	// draw.
-	prunable bool
-}
-
-// kinds lists the resource types the config can hide or prune. Any other
-// type, such as one read through include_all, is always kept.
-var kinds = map[string]kind{
-	TypeInstance: {config.EC2Query(func(q *config.EC2Resources) *config.ResourceQuery { return q.Instances }), false},
-	TypeVPNConnection: {
-		config.EC2Query(func(q *config.EC2Resources) *config.ResourceQuery { return q.VPNConnections }), true,
-	},
-	TypeVPC:    {config.EC2Query(func(q *config.EC2Resources) *config.ResourceQuery { return q.VPCs }), true},
-	TypeSubnet: {config.EC2Query(func(q *config.EC2Resources) *config.ResourceQuery { return q.Subnets }), true},
-	TypeSecurityGroup: {
-		config.EC2Query(func(q *config.EC2Resources) *config.ResourceQuery { return q.SecurityGroups }), true,
-	},
-	TypeNATGateway: {
-		config.EC2Query(func(q *config.EC2Resources) *config.ResourceQuery { return q.NATGateways }),
-		true,
-	},
-	TypeInternetGateway: {
-		config.EC2Query(func(q *config.EC2Resources) *config.ResourceQuery { return q.InternetGateways }), true,
-	},
-	TypeVPNGateway: {
-		config.EC2Query(func(q *config.EC2Resources) *config.ResourceQuery { return q.VPNGateways }),
-		true,
-	},
-	TypeTransitGateway: {
-		config.EC2Query(func(q *config.EC2Resources) *config.ResourceQuery { return q.TransitGateways }), true,
-	},
-	TypeCustomerGateway: {
-		config.EC2Query(func(q *config.EC2Resources) *config.ResourceQuery { return q.CustomerGateways }), true,
-	},
-	TypePrefixList: {
-		config.EC2Query(func(q *config.EC2Resources) *config.ResourceQuery { return q.PrefixLists }),
-		true,
-	},
-}
-
 // Finish completes the records a source read, region by region: it sets each
 // record's Parent, says what keeps each one when unconnected resources are
 // pruned, and applies the config's hide and show_unconnected_resources
@@ -222,14 +177,14 @@ func applyConfig(records []inventory.Record, res *config.Resources, global *bool
 	}
 	for i := range records {
 		rec := &records[i]
-		k, ok := kinds[rec.Type]
+		t, ok := byType[rec.Type]
 		if !ok {
 			continue
 		}
-		q := k.query(res)
+		q := t.Query(res)
 		if q != nil {
 			rec.Hidden, rec.HideChildren = q.Hide, q.HideChildren
 		}
-		rec.Prunable = k.prunable && !show(q)
+		rec.Prunable = t.Prunable && !show(q)
 	}
 }

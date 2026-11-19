@@ -3,6 +3,7 @@
 package config
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -84,69 +85,63 @@ func (c *Config) Account() (string, *AWSAccount) {
 	return "aws", c.Cloud.AWS
 }
 
-// Resources holds one field per AWS service.
+// Resources holds the AWS resource queries, as service -> type -> query:
+// "ec2" -> "instances" -> query. The file keeps the service and type keys as
+// nested objects beside include_all. Config reads no platform, so it does not
+// know which keys exist; the AWS platform's registry checks them before any
+// AWS call.
 type Resources struct {
 	// IncludeAll reads every resource type the source can supply, without
 	// naming each one. Per-type queries still narrow or override their type.
 	// Only the steampipe source supports it.
-	IncludeAll bool `json:"include_all,omitempty"`
+	IncludeAll bool
 
-	EC2            *EC2Resources            `json:"ec2,omitempty"`
-	KMS            *KMSResources            `json:"kms,omitempty"`
-	SecretsManager *SecretsManagerResources `json:"secretsmanager,omitempty"`
-	SSM            *SSMResources            `json:"ssm,omitempty"`
+	// Services maps a service key to its types' queries. A type the file
+	// names with an empty object has a non-nil, empty query.
+	Services map[string]map[string]*ResourceQuery
 }
 
-// KMSResources holds the KMS resource types. Keys are collected only when
-// named. KMS list calls take no filters, so only ids apply.
-type KMSResources struct {
-	Keys *ResourceQuery `json:"keys,omitempty"`
+// Query returns the config's query for one resource type, or nil when the
+// file does not name it.
+func (r *Resources) Query(service, typ string) *ResourceQuery {
+	return r.Services[service][typ]
 }
 
-// SecretsManagerResources holds the Secrets Manager resource types. Secrets
-// are collected only when named.
-type SecretsManagerResources struct {
-	Secrets *ResourceQuery `json:"secrets,omitempty"`
-}
-
-// SSMResources holds the Systems Manager resource types. Parameters are
-// collected only when named.
-type SSMResources struct {
-	Parameters *ResourceQuery `json:"parameters,omitempty"`
-}
-
-// EC2Resources holds one field per EC2 describe call.
-//
-// Primary resources are queried only when the config names them. Container
-// resources are always queried, and their query here only narrows the
-// results.
-type EC2Resources struct {
-	// Primary resources.
-	Instances      *ResourceQuery `json:"instances,omitempty"`
-	VPNConnections *ResourceQuery `json:"vpn_connections,omitempty"`
-
-	// Container resources.
-	InternetGateways *ResourceQuery `json:"internet_gateways,omitempty"`
-	NATGateways      *ResourceQuery `json:"nat_gateways,omitempty"`
-	CustomerGateways *ResourceQuery `json:"customer_gateways,omitempty"`
-	SecurityGroups   *ResourceQuery `json:"security_groups,omitempty"`
-	Subnets          *ResourceQuery `json:"subnets,omitempty"`
-	TransitGateways  *ResourceQuery `json:"transit_gateways,omitempty"`
-	PrefixLists      *ResourceQuery `json:"prefix_lists,omitempty"`
-	VPCs             *ResourceQuery `json:"vpcs,omitempty"`
-	VPNGateways      *ResourceQuery `json:"vpn_gateways,omitempty"`
-}
-
-// EC2Query adapts a field picker on EC2Resources to a lookup on Resources,
-// for code that holds per-type queries as functions. It returns nil when the
-// config has no ec2 section.
-func EC2Query(pick func(*EC2Resources) *ResourceQuery) func(*Resources) *ResourceQuery {
-	return func(r *Resources) *ResourceQuery {
-		if r.EC2 == nil {
-			return nil
-		}
-		return pick(r.EC2)
+// UnmarshalJSON reads include_all and the service sections. Every query is
+// decoded strictly, so a misspelled query field still fails the read.
+func (r *Resources) UnmarshalJSON(data []byte) error {
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
 	}
+	*r = Resources{}
+	for _, key := range slices.Sorted(maps.Keys(raw)) {
+		if key == "include_all" {
+			if err := json.Unmarshal(raw[key], &r.IncludeAll); err != nil {
+				return fmt.Errorf("resources.include_all: %w", err)
+			}
+			continue
+		}
+		var types map[string]json.RawMessage
+		if err := json.Unmarshal(raw[key], &types); err != nil {
+			return fmt.Errorf("resources.%s: %w", key, err)
+		}
+		queries := map[string]*ResourceQuery{}
+		for _, typ := range slices.Sorted(maps.Keys(types)) {
+			q := &ResourceQuery{}
+			dec := json.NewDecoder(bytes.NewReader(types[typ]))
+			dec.DisallowUnknownFields()
+			if err := dec.Decode(q); err != nil {
+				return fmt.Errorf("resources.%s.%s: %w", key, typ, err)
+			}
+			queries[typ] = q
+		}
+		if r.Services == nil {
+			r.Services = map[string]map[string]*ResourceQuery{}
+		}
+		r.Services[key] = queries
+	}
+	return nil
 }
 
 // ResourceQuery selects resources by ID, by filter, or both. AWS ANDs the
@@ -282,45 +277,20 @@ func (a *AWSAccount) validate() error {
 	return a.Resources.validate()
 }
 
-// validate checks every resource query.
+// validate checks every resource query. Which keys exist is the platform's
+// check, not this one.
 func (r Resources) validate() error {
-	queries := map[string]*ResourceQuery{}
-	if r.EC2 != nil {
-		for name, q := range map[string]*ResourceQuery{
-			"instances":         r.EC2.Instances,
-			"vpn_connections":   r.EC2.VPNConnections,
-			"internet_gateways": r.EC2.InternetGateways,
-			"nat_gateways":      r.EC2.NATGateways,
-			"vpcs":              r.EC2.VPCs,
-			"subnets":           r.EC2.Subnets,
-			"security_groups":   r.EC2.SecurityGroups,
-			"vpn_gateways":      r.EC2.VPNGateways,
-			"transit_gateways":  r.EC2.TransitGateways,
-			"customer_gateways": r.EC2.CustomerGateways,
-			"prefix_lists":      r.EC2.PrefixLists,
-		} {
-			queries["ec2."+name] = q
-		}
-	}
-	if r.KMS != nil {
-		queries["kms.keys"] = r.KMS.Keys
-		if r.KMS.Keys != nil && len(r.KMS.Keys.Filters) > 0 {
-			return errors.New("resources.kms.keys: filters are not supported; KMS list calls take none, so use ids")
-		}
-	}
-	if r.SecretsManager != nil {
-		queries["secretsmanager.secrets"] = r.SecretsManager.Secrets
-	}
-	if r.SSM != nil {
-		queries["ssm.parameters"] = r.SSM.Parameters
-	}
-	for _, name := range slices.Sorted(maps.Keys(queries)) {
-		q := queries[name]
-		if q != nil && len(q.IDs) > 0 && q.ShowUnconnectedResources != nil {
-			return fmt.Errorf(
-				"resources.%s: ids and show_unconnected_resources cannot be combined; ids always draws the listed resources",
-				name,
-			)
+	for _, service := range slices.Sorted(maps.Keys(r.Services)) {
+		types := r.Services[service]
+		for _, typ := range slices.Sorted(maps.Keys(types)) {
+			q := types[typ]
+			if q != nil && len(q.IDs) > 0 && q.ShowUnconnectedResources != nil {
+				return fmt.Errorf(
+					"resources.%s.%s: ids and show_unconnected_resources cannot be combined; "+
+						"ids always draws the listed resources",
+					service, typ,
+				)
+			}
 		}
 	}
 	return nil

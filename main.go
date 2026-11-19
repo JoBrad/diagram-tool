@@ -221,7 +221,12 @@ var openSteampipe = func(ctx context.Context) (steampipeDB, error) {
 // read reads the configured account or subscription from its source.
 // Azure is read only from Steampipe.
 func read(ctx context.Context, cfg *config.Config) ([]*inventory.Region, error) {
-	_, acct := cfg.Account()
+	key, acct := cfg.Account()
+	if acct != nil {
+		if err := aws.Validate(&acct.Resources); err != nil {
+			return nil, fmt.Errorf("configuration: cloud.%s.%w", key, err)
+		}
+	}
 	if acct != nil && acct.Source != config.SourceSteampipe {
 		return aws_sdk.Collect(ctx, acct)
 	}

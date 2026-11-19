@@ -141,8 +141,11 @@ The contract between stages:
   - A config names exactly one account, under `cloud.aws` or `cloud.aws_gov`, with
     non-empty `regions`. `source` is `sdk` (the default) or `steampipe`. `account_id` is
     required for `steampipe`.
-  - `include_all` needs the `steampipe` source. KMS key queries take no filters. A query
-    cannot set both `ids` and `show_unconnected_resources`.
+  - `resources` holds `include_all` and a map of service to type to query. Config does not
+    know which services and types exist; it decodes each query strictly, so a misspelled
+    query field fails the read. The platform's registry checks the keys.
+  - `include_all` needs the `steampipe` source. A query cannot set both `ids` and
+    `show_unconnected_resources`.
   - `azure` and `azure_gov` are held as raw JSON and rejected with an error that names the
     cloud.
   - Validation errors name the dotted path of the failing key, prefixed with the file.
@@ -183,14 +186,25 @@ The contract between stages:
 
 ### platform (`internal/platform/aws` and its sources)
 
-`internal/platform/aws` holds what the tool knows about AWS: resource types, attribute
-keys, record builders, rule flattening, and `Finish`. Its two sources are subpackages.
+`internal/platform/aws` holds what the tool knows about AWS: resource types, the type
+registry, attribute keys, record builders, rule flattening, and `Finish`. Its two sources
+are subpackages.
 
 - **Inputs and outputs:** builders take AWS SDK types and return `inventory.Record`
   values. Each source returns `[]*inventory.Region`, one per configured region, in config
   order. `Finish` takes the config and the regions and finishes the records in place.
 - **Depends on:** `config` and `inventory`. `aws_steampipe` also depends on `steampipe`.
   The two sources never import each other.
+- **Registry:** `aws.Registry` lists every type the config can name, with its config path
+  (`resources.<service>.<key>`), its record type, and its flags: `Primary` (collected only
+  when named; other types are context and always collected), `Prunable`, and `NoFilters`
+  (KMS keys, whose list calls take no filters).
+  - `aws.Validate` checks the config's resource keys against the registry and each query
+    against its type's flags. `main.go` runs it before any source reads, so a typo fails
+    before any AWS or database call.
+  - Both sources key their readers by record type and take the config path and the
+    primary flag from the registry. A test in each source checks every reader's type is
+    registered.
 - **Builders:**
   - A builder for a resource with a state returns false for a resource that is gone,
     such as a terminated instance or a deleted gateway, and the caller skips it.
@@ -206,7 +220,10 @@ keys, record builders, rule flattening, and `Finish`. Its two sources are subpac
 - **Finish:** for each region, in turn:
   1. Resolve `contained_in` references into `Parent`, then drop them.
   2. Set `KeepIf` and `Attached` from AWS's connection rules.
-  3. Copy each type's `hide` and `hide_children` onto its records, and set `Prunable`.
+  3. Copy each registered type's `hide` and `hide_children` onto its records, and set
+     `Prunable` from the registry's flag and the type's `show_unconnected_resources`.
+     Types outside the registry, such as those read through `include_all`, are left as
+     built.
 - **Connection rules:** a VPC is kept by the VPN connections of its VPN gateways. An
   internet gateway is kept by its VPC. A VPN gateway is kept by its VPC and its VPN
   connections. A security group is kept by its members. A prefix list is kept by the
@@ -239,8 +256,8 @@ keys, record builders, rule flattening, and `Finish`. Its two sources are subpac
 - **Rules:**
   - Credentials come from the account's `sso_profile_name`, or the SDK's default chain
     when it is empty.
-  - A collector runs only when the config names its type, except container types, which
-    always run.
+  - A collector runs only when the config names its type, except types the registry
+    does not mark primary, which always run. Every registered type has a collector.
   - KMS IDs match a key's ID, ARN, or alias, and a key's name is its first alias.
     Secrets Manager IDs match a name or ARN exactly. SSM IDs become an exact name filter.
   - Prefix list entries are not fetched.
@@ -263,8 +280,8 @@ keys, record builders, rule flattening, and `Finish`. Its two sources are subpac
     regions.
   - Four tables are mapped: instances, VPCs, subnets, and security groups. Other named
     types are logged as not in the database and skipped.
-  - VPCs, subnets, and security groups are always read. Instances are read when named or
-    with `include_all`.
+  - Tables of types the registry does not mark primary (VPCs, subnets, and security
+    groups) are always read. Instances are read when named or with `include_all`.
   - `title` becomes a `Name` tag, jsonb columns decode as the SDK's JSON shapes, and a
     security group with no name takes its ID.
 - **Decisions:**
@@ -491,10 +508,11 @@ subpackage imports the other.
 
 ## Extension points
 
-- **A resource type for the SDK source:** add its query to `config.Resources`, its type,
-  builder, and selection rules to `internal/platform/aws`, a field to the SDK source's
-  results, a collector that writes only that field, its SDK method to the client
-  interface and fakes, and a schema entry.
+- **A resource type for the SDK source:** add its type, builder, and registry entry to
+  `internal/platform/aws`, with any selection rules beyond the registry's flags, then a
+  field to the SDK source's results, a collector that writes only that field, its entry
+  in `collectors`, its SDK method to the client interface and fakes, and a schema entry.
+  The config needs no change.
 - **A resource type for the Steampipe source:** add a table mapping that decodes rows
   into the SDK type the builder takes. With `include_all`, a table with a VPC column is
   read through the generic path with no code change.

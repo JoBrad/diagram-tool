@@ -141,37 +141,37 @@ func TestApplyConfig(t *testing.T) {
 	tests := []struct {
 		name   string
 		global *bool
-		ec2    *config.EC2Resources
+		ec2    queries
 		want   []string
 	}{
 		{"default prunes nothing", nil, nil, nil},
-		{"global true prunes nothing", boolp(true), &config.EC2Resources{}, nil},
+		{"global true prunes nothing", boolp(true), queries{}, nil},
 		{"global false prunes every prunable type", boolp(false), nil, []string{"vpc-1", "subnet-1", "cgw-1", "vpn-1"}},
 		{
 			"per-type true overrides global false", boolp(false),
-			&config.EC2Resources{Subnets: &config.ResourceQuery{ShowUnconnectedResources: boolp(true)}},
+			queries{"subnets": {ShowUnconnectedResources: boolp(true)}},
 			[]string{"vpc-1", "cgw-1", "vpn-1"},
 		},
 		{
 			"per-type false with global unset", nil,
-			&config.EC2Resources{VPCs: &config.ResourceQuery{ShowUnconnectedResources: boolp(false)}},
+			queries{"vpcs": {ShowUnconnectedResources: boolp(false)}},
 			[]string{"vpc-1"},
 		},
 		{
 			"IDs exempt a type", boolp(false),
-			&config.EC2Resources{CustomerGateways: &config.ResourceQuery{IDs: []string{"cgw-1"}}},
+			queries{"customer_gateways": {IDs: []string{"cgw-1"}}},
 			[]string{"vpc-1", "subnet-1", "vpn-1"},
 		},
 		{
 			"instances are never pruned", boolp(false),
-			&config.EC2Resources{Instances: &config.ResourceQuery{ShowUnconnectedResources: boolp(false)}},
+			queries{"instances": {ShowUnconnectedResources: boolp(false)}},
 			[]string{"vpc-1", "subnet-1", "cgw-1", "vpn-1"},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			recs := records()
-			applyConfig(recs, &config.Resources{EC2: tt.ec2}, tt.global)
+			applyConfig(recs, ec2Resources(tt.ec2), tt.global)
 			if got := prunable(recs); !slices.Equal(got, tt.want) {
 				t.Errorf("prunable = %v, want %v", got, tt.want)
 			}
@@ -179,10 +179,10 @@ func TestApplyConfig(t *testing.T) {
 	}
 
 	recs := records()
-	applyConfig(recs, &config.Resources{EC2: &config.EC2Resources{
-		Instances: &config.ResourceQuery{Hide: true},
-		VPCs:      &config.ResourceQuery{HideChildren: true},
-	}}, nil)
+	applyConfig(recs, ec2Resources(queries{
+		"instances": {Hide: true},
+		"vpcs":      {HideChildren: true},
+	}), nil)
 	if !recs[0].Hidden || recs[0].HideChildren || recs[1].Hidden || !recs[1].HideChildren || recs[2].Hidden {
 		t.Errorf("hide flags = %+v", recs[:3])
 	}

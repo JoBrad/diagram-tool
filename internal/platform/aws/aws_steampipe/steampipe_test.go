@@ -64,9 +64,15 @@ func row(pairs ...string) steampipe.Row {
 }
 
 // cfgWith returns an account with no account ID; withAccount sets one.
-func cfgWith(regions []string, ec2 *config.EC2Resources) *config.AWSAccount {
-	return &config.AWSAccount{Source: config.SourceSteampipe, Regions: regions, Resources: config.Resources{EC2: ec2}}
+func cfgWith(regions []string, q ec2) *config.AWSAccount {
+	return &config.AWSAccount{
+		Source: config.SourceSteampipe, Regions: regions,
+		Resources: config.Resources{Services: map[string]map[string]*config.ResourceQuery{"ec2": q}},
+	}
 }
+
+// ec2 maps an EC2 type's key to its query.
+type ec2 = map[string]*config.ResourceQuery
 
 func withAccount(acct *config.AWSAccount, id string) *config.AWSAccount {
 	acct.AccountID = id
@@ -103,7 +109,7 @@ func testSource() *fakeSource {
 
 func TestCollect(t *testing.T) {
 	src := testSource()
-	cfg := cfgWith([]string{"us-east-1", "us-west-2"}, &config.EC2Resources{Instances: &config.ResourceQuery{}})
+	cfg := cfgWith([]string{"us-east-1", "us-west-2"}, ec2{"instances": {}})
 	regions, err := Collect(context.Background(), src, withAccount(cfg, "111111111111"))
 	if err != nil {
 		t.Fatal(err)
@@ -165,8 +171,8 @@ func TestCollect(t *testing.T) {
 
 func TestCollectQueries(t *testing.T) {
 	src := testSource()
-	cfg := cfgWith([]string{"us-east-1"}, &config.EC2Resources{
-		Instances: &config.ResourceQuery{IDs: []string{"i-1"}},
+	cfg := cfgWith([]string{"us-east-1"}, ec2{
+		"instances": {IDs: []string{"i-1"}},
 	})
 	if _, err := Collect(context.Background(), src, withAccount(cfg, "111111111111")); err != nil {
 		t.Fatal(err)
@@ -226,7 +232,7 @@ func TestCollectErrors(t *testing.T) {
 		{"no account", testSource(), cfgWith(regions, nil), "", "account ID"},
 		{
 			"filters", testSource(),
-			cfgWith(regions, &config.EC2Resources{VPCs: &config.ResourceQuery{
+			cfgWith(regions, ec2{"vpcs": {
 				Filters: []config.Filter{{Name: "tag:env", Values: []string{"prod"}}},
 			}}),
 			"111111111111", "resources.ec2.vpcs: filters",
@@ -251,7 +257,7 @@ func TestCollectErrors(t *testing.T) {
 			&fakeSource{rows: map[string][]steampipe.Row{"aws_ec2_instance": {
 				row("region", "us-east-1", "instance_id", "i-1", "security_groups", "[1]"),
 			}}},
-			cfgWith(regions, &config.EC2Resources{Instances: &config.ResourceQuery{}}),
+			cfgWith(regions, ec2{"instances": {}}),
 			"111111111111", "instance i-1: decode security_groups",
 		},
 	}
@@ -267,17 +273,27 @@ func TestCollectErrors(t *testing.T) {
 
 func TestMissing(t *testing.T) {
 	q := &config.ResourceQuery{}
-	r := &config.Resources{
-		EC2:            &config.EC2Resources{NATGateways: q, PrefixLists: q, VPCs: q},
-		KMS:            &config.KMSResources{Keys: q},
-		SecretsManager: &config.SecretsManagerResources{Secrets: q},
-		SSM:            &config.SSMResources{Parameters: q},
-	}
+	r := &config.Resources{Services: map[string]map[string]*config.ResourceQuery{
+		"ec2":            {"nat_gateways": q, "prefix_lists": q, "vpcs": q},
+		"kms":            {"keys": q},
+		"secretsmanager": {"secrets": q},
+		"ssm":            {"parameters": q},
+	}}
 	want := []string{"ec2.nat_gateways", "ec2.prefix_lists", "kms.keys", "secretsmanager.secrets", "ssm.parameters"}
 	if got := missing(r); !slices.Equal(got, want) {
 		t.Errorf("missing = %v, want %v", got, want)
 	}
 	if got := missing(&config.Resources{}); got != nil {
 		t.Errorf("missing(empty) = %v, want none", got)
+	}
+}
+
+// Every table reads a registered type, so the registry decides when it is
+// read and what the logs call it.
+func TestTablesRegistered(t *testing.T) {
+	for _, tb := range tables {
+		if _, ok := aws.Lookup(tb.typ); !ok {
+			t.Errorf("table %s reads %q, which is not in aws.Registry", tb.Name, tb.typ)
+		}
 	}
 }

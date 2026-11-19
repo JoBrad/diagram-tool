@@ -1,6 +1,6 @@
 ---
 type: project
-status: ready
+status: active
 created: 2026-11-17
 tags: [feature, aws, resource-types, drawio, schema]
 branch: feature/compute-data-storage
@@ -134,9 +134,9 @@ checks in `AGENTS.md` pass. Ships as v0.2.0.
 
 Shared work, before the types:
 
-- [ ] Type registry in `internal/platform/aws`, the registry-backed `config.Resources` map,
+- [x] Type registry in `internal/platform/aws`, the registry-backed `config.Resources` map,
       and the platform validation step. Move the existing EC2, KMS, Secrets Manager, and
-      SSM types onto it (added 2026-11-17)
+      SSM types onto it (added 2026-11-17, done 2026-11-19)
 - [ ] Generate `schema/config.schema.json` from the registry, and update the "Config and
       schema" section of `AGENTS.md` and the "Unknown config keys fail the read" entry in
       `docs/DECISIONS.md` (added 2026-11-17)
