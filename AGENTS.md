@@ -120,6 +120,8 @@ for the model's side. Update them with any rule change.
   `GetParameter`, or SDK types there.
 - Tests use hand-built data only. Never commit real account data (IDs, IPs, CIDRs, names) to
   tests or fixtures.
+- Secret scanning: gitleaks, on staged changes before every commit:
+  `gitleaks git --pre-commit --staged --redact --no-banner .`
 
 ## Config and schema
 
